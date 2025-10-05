@@ -1,30 +1,78 @@
-import Link from 'next/link';
+'use client';
 
-export default function HomePage() {
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Import Link for the button
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [signedIn, setSignedIn] = useState(false); // New state for success message
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        // Instead of redirecting, we now set the state
+        setSignedIn(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${location.origin}/auth/callback` },
+    });
+    if (error) {
+      alert(`Error: ${error.message}`);
+    } else {
+      setSubmitted(true);
+    }
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold text-gray-800">
-          Welcome to AssetDrop
-        </h1>
-        <p className="mt-4 text-xl text-gray-600">
-          The easiest way to collect assets from your clients.
-        </p>
-        <div className="mt-8 flex justify-center gap-x-4">
-          <Link
-            href="/login"
-            className="rounded-md bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          >
-            Log In
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-md bg-white px-6 py-3 text-lg font-semibold text-gray-800 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-100"
-          >
-            Sign Up
-          </Link>
-        </div>
+    <div className="login-container">
+      <div className="login-card">
+        {/* State 3: User has successfully signed in */}
+        {signedIn ? (
+          <div>
+            <h1 className="login-title">Successfully Logged In! ✅</h1>
+            <p className="login-submitted-text">You have been authenticated. You can now close this tab.</p>
+          
+          </div>
+        ) :
+        /* State 2: User has submitted their email */
+        submitted ? (
+          <div>
+            <h1 className="login-title">one-time login link sent! ✨</h1>
+            <p className="login-submitted-text">Please check <span className="font-semibold">{email}</span> to securely sign in.</p>
+          </div>
+        ) : (
+        /* State 1: Initial form */
+          <>
+            <h1 className="login-title">Access Your Dashboard</h1>
+            <p className="login-subtitle">Enter your email to receive a secure, one-time login link.</p>
+            <form onSubmit={handleMagicLink}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="login-input"
+                placeholder="you@example.com"
+                required
+              />
+              <button type="submit" className="login-button">
+         Send Secure Link
+              </button>
+            </form>
+          </>
+        )}
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,80 +1,77 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Import Link for the button
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [signedIn, setSignedIn] = useState(false); // New state for success message
+  const router = useRouter();
   const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_in') {
+        // Instead of redirecting, we now set the state
+        setSignedIn(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(''); // Clear previous messages
-
     const { error } = await supabase.auth.signUp({
       email,
-      password,
-      options: {
-        emailRedirectTo: `${location.origin}/auth/callback`,
-      },
+      options: { emailRedirectTo: `${location.origin}/auth/callback` },
     });
-
     if (error) {
-      setMessage(`Error: ${error.message}`);
+        alert(`Error: ${error.message}`);
     } else {
-      setMessage('Check your email to complete registration!');
+        setSubmitted(true);
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
-        <h1 className="mb-6 text-center text-3xl font-bold text-gray-800">
-          Create Your Account
-        </h1>
-        <form onSubmit={handleSignUp}>
-          <div className="mb-4">
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
+    <div className="login-container">
+      <div className="login-card">
+      {/* State 3: User has successfully signed in */}
+      {signedIn ? (
+          <div>
+            <h1 className="login-title">Account Confirmed! ✅</h1>
+            <p className="login-submitted-text">Thank you for signing up. You have been successfully authenticated.</p>
+             <Link href="/dashboard" className="login-button mt-6 inline-block">
+              Go to Dashboard
+            </Link>
           </div>
-          <div className="mb-6">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
+        ) :
+        /* State 2: User has submitted their email */
+        submitted ? (
+          <div>
+            <h1 className="login-title">Confirm your email! 📧</h1>
+            <p className="login-submitted-text">We've sent a confirmation link to <span className="font-semibold">{email}</span>.</p>
           </div>
-           {message && <p className="mb-4 text-center text-gray-600">{message}</p>}
-          <button
-            type="submit"
-            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          >
-            Sign Up
-          </button>
-        </form>
+        ) : (
+        /* State 1: Initial form */
+          <>
+            <h1 className="login-title">Create Your Account</h1>
+            <p className="login-subtitle">Enter your email to get started with AssetDrop.</p>
+            <form onSubmit={handleSignUp}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="login-input"
+                placeholder="you@example.com"
+                required
+              />
+              <button type="submit" className="login-button">Sign Up</button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
