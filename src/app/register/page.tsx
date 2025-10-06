@@ -14,10 +14,10 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_in') {
-        // Instead of redirecting, we now set the state
-        setSignedIn(true);
-      }
+   if (event === 'SIGNED_IN') {
+  setSignedIn(true);
+}
+
     });
     return () => subscription.unsubscribe();
   }, [supabase.auth]);
