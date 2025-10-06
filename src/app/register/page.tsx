@@ -52,7 +52,7 @@ export default function RegisterPage() {
         submitted ? (
           <div>
             <h1 className="login-title">Confirm your email! 📧</h1>
-            <p className="login-submitted-text">We've sent a confirmation link to <span className="font-semibold">{email}</span>.</p>
+            <p className="login-submitted-text">We have sent a confirmation link to <span className="font-semibold">{email}</span>.</p>
           </div>
         ) : (
         /* State 1: Initial form */
