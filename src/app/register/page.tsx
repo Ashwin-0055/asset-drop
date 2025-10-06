@@ -14,9 +14,10 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-   if (event === 'SIGNED_IN') {
+if (event === 'SIGNED_IN') {
   setSignedIn(true);
 }
+
 
     });
     return () => subscription.unsubscribe();
@@ -24,10 +25,11 @@ export default function RegisterPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.auth.signUp({
-      email,
-      options: { emailRedirectTo: `${location.origin}/auth/callback` },
-    });
+const { error } = await supabase.auth.signInWithOtp({
+  email,
+  options: { emailRedirectTo: `${location.origin}/auth/callback` },
+});
+
     if (error) {
         alert(`Error: ${error.message}`);
     } else {
