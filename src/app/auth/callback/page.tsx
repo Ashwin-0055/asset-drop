@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link'; // Import the Link component
+export const dynamic = 'force-dynamic';
+
 
 export default function AuthCallback() {
   const supabase = createClientComponentClient();
