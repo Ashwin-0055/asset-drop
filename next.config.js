@@ -18,8 +18,6 @@ const nextConfig = {
     },
     optimizePackageImports: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
   },
-  // Enable SWC minification for faster builds
-  swcMinify: true,
   // Optimize production builds
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,

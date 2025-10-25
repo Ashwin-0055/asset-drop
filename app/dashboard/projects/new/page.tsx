@@ -94,7 +94,7 @@ export default function NewProjectPage() {
                 <CardTitle className="text-3xl">Create New Project</CardTitle>
               </div>
               <CardDescription className="text-base">
-                Enter project details to get started. You'll build your custom form next.
+                Enter project details to get started. You&apos;ll build your custom form next.
               </CardDescription>
             </CardHeader>
 
@@ -148,7 +148,7 @@ export default function NewProjectPage() {
                     className="min-h-[100px] text-base"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Optional: Add context about what you're collecting
+                    Optional: Add context about what you&apos;re collecting
                   </p>
                 </div>
 
@@ -197,9 +197,9 @@ export default function NewProjectPage() {
               <div className="flex gap-3">
                 <div className="text-blue-500 text-2xl">💡</div>
                 <div className="space-y-1">
-                  <h3 className="font-semibold text-blue-900">What's Next?</h3>
+                  <h3 className="font-semibold text-blue-900">What&apos;s Next?</h3>
                   <p className="text-sm text-blue-700">
-                    After creating your project, you'll use our drag-and-drop builder to
+                    After creating your project, you&apos;ll use our drag-and-drop builder to
                     design a custom form for collecting files from your client. Add file uploads,
                     text fields, and more!
                   </p>

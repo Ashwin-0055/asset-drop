@@ -458,7 +458,7 @@ export default function ClientPortalPage() {
                 <div className="flex-1">
                   <h3 className="font-semibold text-yellow-900 text-sm">File Uploads Currently Unavailable</h3>
                   <p className="text-yellow-800 text-sm mt-1">
-                    The project owner hasn't connected their Google Drive account yet. You can still fill out text fields, but file uploads won't work until they complete the setup.
+                    The project owner hasn&apos;t connected their Google Drive account yet. You can still fill out text fields, but file uploads won&apos;t work until they complete the setup.
                   </p>
                   <p className="text-yellow-700 text-xs mt-2">
                     If you need to upload files, please contact the project owner to connect their Google Drive.

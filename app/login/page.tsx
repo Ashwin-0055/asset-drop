@@ -183,7 +183,7 @@ export default function LoginPage() {
                 </div>
                 <h2 className="text-2xl font-bold mb-2 text-slate-900">Check your email</h2>
                 <p className="text-slate-600 mb-6">
-                  We've sent a magic link to <strong>{email}</strong>
+                  We&apos;ve sent a magic link to <strong>{email}</strong>
                 </p>
                 <p className="text-sm text-slate-500 mb-6">
                   Click the link in the email to sign in. The link will expire in 1 hour.
