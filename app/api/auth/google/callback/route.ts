@@ -48,13 +48,14 @@ export async function GET(request: NextRequest) {
 
         if (existingToken) {
           // Update existing tokens
+          // @ts-ignore - Supabase type inference issue
           const { error: updateError } = await supabase
             .from('user_tokens')
             .update({
               access_token: providerToken,
               refresh_token: providerRefreshToken,
               token_expiry: expiryDate.toISOString(),
-            } as any)
+            })
             .eq('user_id', userId)
 
           if (updateError) {
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest) {
           }
         } else {
           // Insert new tokens
+          // @ts-ignore - Supabase type inference issue
           const { error: insertError } = await supabase
             .from('user_tokens')
             .insert({
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
               access_token: providerToken,
               refresh_token: providerRefreshToken,
               token_expiry: expiryDate.toISOString(),
-            } as any)
+            })
 
           if (insertError) {
             console.error('Error storing user tokens:', insertError)
