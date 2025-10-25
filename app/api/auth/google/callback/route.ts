@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
               access_token: providerToken,
               refresh_token: providerRefreshToken,
               token_expiry: expiryDate.toISOString(),
-            })
+            } as any)
             .eq('user_id', userId)
 
           if (updateError) {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
               access_token: providerToken,
               refresh_token: providerRefreshToken,
               token_expiry: expiryDate.toISOString(),
-            })
+            } as any)
 
           if (insertError) {
             console.error('Error storing user tokens:', insertError)
