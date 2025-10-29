@@ -248,6 +248,23 @@ Error: Missing API key. Pass it to the constructor `new Resend("re_123")`
 ✅ Fixed! The code now uses a dummy key during build time.
 Just redeploy and it should work.
 
+### Magic Link "OTP Expired" Error ⚠️ COMMON
+
+**Error Message:**
+```
+?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired
+```
+
+**Cause:** Supabase doesn't recognize your Vercel domain
+
+**Quick Fix:**
+1. Go to Supabase Dashboard → Auth → URL Configuration
+2. Set **Site URL** to: `https://your-vercel-domain.vercel.app`
+3. Add to **Redirect URLs**: `https://your-vercel-domain.vercel.app/**`
+4. Save and test again
+
+**See SUPABASE_VERCEL_FIX.md for complete guide**
+
 ### 500 Error on Login
 
 **Possible Causes:**
