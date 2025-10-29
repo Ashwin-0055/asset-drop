@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     console.log('📤 Sending email via Resend...')
 
     const emailResult = await resend.emails.send({
-      from: 'AssetDrop <noreply@assetdrop.app>',
+      from: 'AssetDrop <onboarding@resend.dev>',
       to: clientEmail,
       subject: `Asset Review Complete - ${project.name}`,
       html: htmlContent,
