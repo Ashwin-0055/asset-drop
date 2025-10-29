@@ -4,7 +4,7 @@
 
 **Build Date**: October 10, 2025
 
-**Last Updated**: October 29, 2025 (Email Notifications & Asset Review System)
+**Last Updated**: October 29, 2025 (Email Notifications Phase 2 - Complete Client Feedback Loop)
 
 **Dev Server**: Running on http://localhost:3000
 
@@ -434,7 +434,6 @@ AssetDrop is a fully functional, production-ready asset collection platform that
   - Created `FEATURE_EMAIL_NOTIFICATIONS.md` - Complete setup guide with troubleshooting
 
 - **Phase 1 Status**: ✅ Complete (email infrastructure ready)
-- **Phase 2 Pending**: Collection form email input, client portal history, re-upload functionality
 
 **41. Vercel Build Failure - Missing Resend API Key** ✅
 - **Problem**: Vercel build failing with "Missing API key. Pass it to constructor new Resend("re_123")"
@@ -443,6 +442,67 @@ AssetDrop is a fully functional, production-ready asset collection platform that
 - **Fixed Files**: `lib/email/resend.ts:6`
 - **Fix**: `new Resend(process.env.RESEND_API_KEY || 'dummy_key_for_build')`
 - **Impact**: Build succeeds on Vercel, runtime checks prevent actual usage without real key
+
+**42. Email Notification System (Phase 2)** ✅
+- **Problem**: Phase 1 required manual client_email entry in database - not usable in production
+- **Solution**: Implemented complete end-to-end client email capture and submission history
+- **Goal**: Make email system fully functional without manual database edits
+
+- **Collection Form Email Input**:
+  - Added prominent email field at top of every collection form
+  - Blue highlighted section with clear messaging
+  - Required field with client-side and server-side validation
+  - Email regex validation: `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
+  - Helper text explains email will be used for notifications
+  - Email pre-populated in success message
+  - Fixed Files: `app/collect/[linkId]/page.tsx:36-38, 157-177, 249, 329, 510-527, 448-452`
+
+- **Upload API Email Storage**:
+  - Modified upload API to accept clientEmail in FormData
+  - Automatically saves client_email with every asset record
+  - Includes email in activity log for tracking
+  - Updated API documentation
+  - Fixed Files: `app/api/upload/route.ts:13, 35, 42, 191, 216`
+
+- **Client Submission History View**:
+  - After successful submission, automatically loads all submissions for that email
+  - Professional history display grouped by status:
+    - Pending Review (yellow) - shows submission date
+    - Approved (green) - shows approval remarks in feedback box
+    - Needs Revision (red) - shows rejection reasons in reason box
+  - Each asset shows file name, status, dates, and feedback
+  - Mobile responsive design with color-coded status indicators
+  - Loading state while fetching history
+  - Fixed Files: `app/collect/[linkId]/page.tsx:37-38, 159-179, 387-390, 465-609`
+
+- **Re-upload Functionality**:
+  - "Re-upload Revised Version" button on rejected assets
+  - "Submit More Files" button at bottom for additional uploads
+  - Buttons reset form while keeping email pre-filled
+  - Smooth scroll to top of page
+  - All submissions tracked separately (maintains complete history)
+  - Previous submissions remain visible when re-uploading
+  - Fixed Files: `app/collect/[linkId]/page.tsx:571-581, 595-605`
+
+- **Enhanced Success Page**:
+  - Shows submission confirmation with client email
+  - Displays complete submission history below
+  - Groups assets by status with visual indicators
+  - Shows approval remarks and rejection reasons
+  - Provides clear next steps (re-upload or close)
+  - Professional layout with cards and spacing
+
+- **Features**:
+  - ✅ Email captured automatically on every submission
+  - ✅ No manual database editing required
+  - ✅ Clients see their complete submission history
+  - ✅ Approval remarks visible to clients
+  - ✅ Rejection reasons visible to clients
+  - ✅ Easy re-upload workflow for rejected files
+  - ✅ Email notifications sent automatically (from Phase 1)
+  - ✅ Complete feedback loop between admin and client
+
+- **Phase 2 Status**: ✅ Complete (email system fully functional end-to-end)
 
 ---
 
@@ -457,8 +517,12 @@ AssetDrop is a fully functional, production-ready asset collection platform that
 - ✅ Asset Approval Workflow
 - ✅ **Auto-Delete Rejected Files from Drive**
 - ✅ **Auto-Delete Project Folders from Drive**
-- ✅ **Email Notifications for Asset Reviews** (NEW)
-- ✅ **Approval Remarks & Rejection Reasons** (NEW)
+- ✅ **Email Notifications for Asset Reviews**
+- ✅ **Approval Remarks & Rejection Reasons**
+- ✅ **Client Email Capture in Collection Forms** (NEW)
+- ✅ **Client Submission History View** (NEW)
+- ✅ **Re-upload Functionality for Rejected Files** (NEW)
+- ✅ **Complete Client Feedback Loop** (NEW)
 - ✅ Activity Timeline & Audit Logs
 - ✅ Password-Protected Links
 - ✅ Link Expiration Management

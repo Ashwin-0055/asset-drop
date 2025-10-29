@@ -33,6 +33,9 @@ export default function ClientPortalPage() {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [driveNotConnected, setDriveNotConnected] = useState(false)
+  const [clientEmail, setClientEmail] = useState('')
+  const [submissionHistory, setSubmissionHistory] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   useEffect(() => {
     loadProject()
@@ -153,7 +156,50 @@ export default function ClientPortalPage() {
     setFormValues(prev => ({ ...prev, [fieldId]: value }))
   }
 
+  async function loadSubmissionHistory(email: string) {
+    if (!project) return
+
+    setLoadingHistory(true)
+    try {
+      const { data, error } = await supabase
+        .from('assets')
+        .select('*')
+        .eq('project_id', project.id)
+        .eq('client_email', email)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      setSubmissionHistory(data || [])
+    } catch (error) {
+      console.error('Error loading submission history:', error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
   function validateForm() {
+    // Validate email first (always required)
+    if (!clientEmail || !clientEmail.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Email address is required',
+        variant: 'destructive',
+      })
+      return false
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(clientEmail)) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a valid email address',
+        variant: 'destructive',
+      })
+      return false
+    }
+
     const requiredFields = formFields.filter(f => f.is_required)
 
     for (const field of requiredFields) {
@@ -224,6 +270,7 @@ export default function ClientPortalPage() {
           const formData = new FormData()
           formData.append('file', file)
           formData.append('projectId', projectId)
+          formData.append('clientEmail', clientEmail)
           if (field.id) {
             formData.append('formFieldId', field.id)
           }
@@ -303,6 +350,7 @@ export default function ClientPortalPage() {
               google_drive_file_id: 'text-response', // Placeholder for text-based responses
               status: 'pending',
               uploaded_by: 'client',
+              client_email: clientEmail,
               metadata: {
                 field_type: field.field_type,
                 content: value,
@@ -337,6 +385,9 @@ export default function ClientPortalPage() {
       }
 
       setSubmitted(true)
+
+      // Load submission history after successful submission
+      await loadSubmissionHistory(clientEmail)
     } catch (error: any) {
       console.error('Error submitting form:', error)
 
@@ -412,20 +463,148 @@ export default function ClientPortalPage() {
   }
 
   if (submitted) {
+    const approvedAssets = submissionHistory.filter(a => a.status === 'approved')
+    const rejectedAssets = submissionHistory.filter(a => a.status === 'rejected')
+    const pendingAssets = submissionHistory.filter(a => a.status === 'pending')
+
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="py-12">
-            <CheckCircle className="h-20 w-20 text-green-500 mx-auto mb-6" />
-            <h1 className="text-2xl font-bold mb-2">Successfully Submitted!</h1>
-            <p className="text-gray-600 mb-6">
-              Your files have been uploaded and are being reviewed.
-            </p>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4">
+          <Card className="mb-6">
+            <CardContent className="py-12 text-center">
+              <CheckCircle className="h-20 w-20 text-green-500 mx-auto mb-6" />
+              <h1 className="text-2xl font-bold mb-2">Successfully Submitted!</h1>
+              <p className="text-gray-600 mb-4">
+                Your files have been uploaded and are being reviewed.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 max-w-md mx-auto">
+                <p className="text-sm text-gray-700">
+                  We'll send you an email at <strong>{clientEmail}</strong> once your submission has been reviewed.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Submission History */}
+          {loadingHistory ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">Loading your submission history...</p>
+              </CardContent>
+            </Card>
+          ) : submissionHistory.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Submission History</CardTitle>
+                <p className="text-sm text-gray-500">
+                  Track the status of all your submissions below
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Pending Assets */}
+                {pendingAssets.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                      <div className="h-2 w-2 bg-yellow-500 rounded-full"></div>
+                      Pending Review ({pendingAssets.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingAssets.map(asset => (
+                        <div key={asset.id} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="font-medium text-sm">{asset.file_name}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Submitted {new Date(asset.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Approved Assets */}
+                {approvedAssets.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      Approved ({approvedAssets.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {approvedAssets.map(asset => (
+                        <div key={asset.id} className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="font-medium text-sm text-green-900">{asset.file_name}</p>
+                          {asset.approval_remark && (
+                            <div className="mt-2 p-2 bg-white rounded border border-green-300">
+                              <p className="text-xs font-semibold text-green-800 mb-1">Feedback:</p>
+                              <p className="text-xs text-gray-700">{asset.approval_remark}</p>
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-500 mt-2">
+                            Approved {new Date(asset.updated_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejected Assets */}
+                {rejectedAssets.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                      Needs Revision ({rejectedAssets.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {rejectedAssets.map(asset => (
+                        <div key={asset.id} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="font-medium text-sm text-red-900">{asset.file_name}</p>
+                          {asset.rejection_reason && (
+                            <div className="mt-2 p-2 bg-white rounded border border-red-300">
+                              <p className="text-xs font-semibold text-red-800 mb-1">Reason for rejection:</p>
+                              <p className="text-xs text-gray-700">{asset.rejection_reason}</p>
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-500 mt-2">
+                            Rejected {new Date(asset.updated_at).toLocaleDateString()}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-3 w-full"
+                            onClick={() => {
+                              setSubmitted(false)
+                              window.scrollTo({ top: 0, behavior: 'smooth' })
+                            }}
+                          >
+                            Re-upload Revised Version
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="text-center mt-6">
             <p className="text-sm text-gray-500">
-              You can close this window now.
+              You can close this window or submit additional files using the button below
             </p>
-          </CardContent>
-        </Card>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => {
+                setSubmitted(false)
+                setFormValues({})
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            >
+              Submit More Files
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -483,6 +662,25 @@ export default function ClientPortalPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Email Input - Always Required */}
+              <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  Your Email Address
+                  <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-600 mb-2">
+                  We'll use this email to notify you about the review status of your submission
+                </p>
+                <Input
+                  type="email"
+                  placeholder="your.email@example.com"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  required
+                  className="bg-white"
+                />
+              </div>
+
               {formFields.length === 0 && (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
                   <p className="text-gray-500">No form fields configured yet</p>

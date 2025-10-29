@@ -10,6 +10,7 @@ import { uploadFile, createFolder, ensureAssetDropFolder } from '@/lib/google-dr
  *   - file: File to upload
  *   - projectId: ID of the project
  *   - formFieldId: ID of the form field (optional)
+ *   - clientEmail: Email address of the client submitting the file
  */
 export async function POST(request: NextRequest) {
   try {
@@ -32,12 +33,14 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
     const projectId = formData.get('projectId') as string
     const formFieldId = formData.get('formFieldId') as string | null
+    const clientEmail = formData.get('clientEmail') as string | null
 
     console.log('📋 Request details:', {
       fileName: file?.name,
       fileSize: file?.size,
       projectId,
-      formFieldId
+      formFieldId,
+      clientEmail
     })
 
     // Validate required fields
@@ -186,6 +189,7 @@ export async function POST(request: NextRequest) {
         file_size: Number(uploadedFile.size) || file.size,
         google_drive_file_id: uploadedFile.id, // Match schema column name
         uploaded_by: 'client', // Anonymous upload from client portal
+        client_email: clientEmail, // Client email for review notifications
         status: 'pending'
       })
       .select()
@@ -209,7 +213,8 @@ export async function POST(request: NextRequest) {
           asset_id: asset.id,
           file_name: file.name,
           file_type: file.type,
-          file_size: file.size
+          file_size: file.size,
+          client_email: clientEmail
         }
       })
 
