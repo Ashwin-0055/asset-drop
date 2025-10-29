@@ -266,6 +266,14 @@ export default function ClientPortalPage() {
         if (!files || files.length === 0) continue
 
         for (const file of files) {
+          // Check file size (warn if > 50MB)
+          const fileSizeMB = file.size / (1024 * 1024)
+          console.log(`📦 Uploading ${file.name} (${fileSizeMB.toFixed(2)} MB)`)
+
+          if (fileSizeMB > 50) {
+            console.warn(`⚠️  Large file detected: ${fileSizeMB.toFixed(2)} MB - this may take a while`)
+          }
+
           // Use API route to upload file
           const formData = new FormData()
           formData.append('file', file)
@@ -275,26 +283,36 @@ export default function ClientPortalPage() {
             formData.append('formFieldId', field.id)
           }
 
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          })
+          try {
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            })
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            console.error(`❌ Failed to upload ${file.name}:`, errorData)
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              console.error(`❌ Failed to upload ${file.name}:`, errorData)
 
-            // Handle specific error: Google Drive not connected
-            if (errorData.error?.includes('Google Drive not connected')) {
-              throw new Error('The project owner needs to connect their Google Drive account before files can be uploaded. Please contact them to set this up.')
+              // Handle specific error: Google Drive not connected
+              if (errorData.error?.includes('Google Drive not connected')) {
+                throw new Error('The project owner needs to connect their Google Drive account before files can be uploaded. Please contact them to set this up.')
+              }
+
+              // Generic error
+              throw new Error(`Failed to upload ${file.name}: ${errorData.error || errorData.details || 'Unknown error'}`)
             }
 
-            // Generic error
-            throw new Error(`Failed to upload ${file.name}: ${errorData.error || errorData.details || 'Unknown error'}`)
+            const asset = await response.json()
+            uploadedAssets.push(asset)
+            console.log(`✅ Successfully uploaded ${file.name}`)
+          } catch (fetchError: any) {
+            // Handle network errors specifically
+            if (fetchError.message === 'Failed to fetch' || fetchError.name === 'TypeError') {
+              console.error(`❌ Network error uploading ${file.name}:`, fetchError)
+              throw new Error(`Network connection lost while uploading ${file.name}. This can happen with large files or slow connections. Please try again with a smaller file or check your internet connection.`)
+            }
+            throw fetchError
           }
-
-          const asset = await response.json()
-          uploadedAssets.push(asset)
         }
       }
     }
@@ -680,6 +698,22 @@ export default function ClientPortalPage() {
                   className="bg-white"
                 />
               </div>
+
+              {/* File Size Info */}
+              {formFields.some(f =>
+                f.field_type === 'file_upload' ||
+                f.field_type === 'image_gallery' ||
+                f.field_type === 'audio_video'
+              ) && (
+                <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded border border-gray-200">
+                  <p className="font-medium mb-1">File Upload Guidelines:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Maximum file size: 50 MB per file</li>
+                    <li>Large files may take longer to upload</li>
+                    <li>Ensure stable internet connection for uploads</li>
+                  </ul>
+                </div>
+              )}
 
               {formFields.length === 0 && (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">

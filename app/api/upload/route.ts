@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/server'
 import { uploadFile, createFolder, ensureAssetDropFolder } from '@/lib/google-drive/api'
 
+// Configure route to handle larger file uploads
+export const maxDuration = 60 // Maximum execution time in seconds
+export const dynamic = 'force-dynamic' // Disable static optimization
+
 /**
  * POST /api/upload
  * Handles file uploads to Google Drive and creates asset records
