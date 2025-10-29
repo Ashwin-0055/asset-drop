@@ -11,7 +11,9 @@
       "Bash(npm uninstall:*)",
       "Bash(if exist \".next\" rmdir /s /q .next)",
       "Bash(npm run dev:*)",
-      "Bash(node scripts/add-metadata-column.js:*)"
+      "Bash(node scripts/add-metadata-column.js:*)",
+      "Bash(git add:*)",
+      "Bash(if not exist \"lib\\email\" mkdir \"lib\\email\")"
     ],
     "deny": [],
     "ask": []

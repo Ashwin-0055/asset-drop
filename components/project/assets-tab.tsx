@@ -39,6 +39,10 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
   const [assetToReject, setAssetToReject] = useState<Asset | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
+  const [assetToApprove, setAssetToApprove] = useState<Asset | null>(null)
+  const [approvalRemark, setApprovalRemark] = useState('')
+  const [sendingNotification, setSendingNotification] = useState(false)
 
   useEffect(() => {
     loadAssets()
@@ -88,7 +92,7 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
     setGroupedAssets(grouped)
   }
 
-  async function updateAssetStatus(assetId: string, status: 'approved' | 'rejected', reason?: string) {
+  async function updateAssetStatus(assetId: string, status: 'approved' | 'rejected', remark?: string) {
     setProcessingAssetId(assetId)
 
     // Get the asset data before updating
@@ -123,14 +127,16 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
         }
       }
 
-      // Update status in database (with rejection reason if provided)
+      // Update status in database (with remark if provided)
       const updateData: any = {
         status,
         updated_at: new Date().toISOString()
       }
 
-      if (status === 'rejected' && reason) {
-        updateData.rejection_reason = reason
+      if (status === 'rejected' && remark) {
+        updateData.rejection_reason = remark
+      } else if (status === 'approved' && remark) {
+        updateData.approval_remark = remark
       }
 
       const { error } = await supabase
@@ -140,8 +146,12 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
 
       if (error) throw error
 
-      // Update actual state
-      setAssets(assets.map(a => a.id === assetId ? { ...a, status, rejection_reason: reason } : a))
+      // Update actual state with remark
+      const updatedAsset = status === 'approved'
+        ? { ...asset, status, approval_remark: remark }
+        : { ...asset, status, rejection_reason: remark }
+
+      setAssets(assets.map(a => a.id === assetId ? updatedAsset : a))
 
       // Log activity
       await supabase.from('activity_log').insert({
@@ -150,7 +160,7 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
         action_details: {
           asset_id: assetId,
           deleted_from_drive: status === 'rejected' && asset?.google_drive_file_id !== 'text-response',
-          rejection_reason: reason || null
+          remark: remark || null
         },
       })
 
@@ -160,6 +170,12 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
           ? 'Asset rejected and deleted from Google Drive'
           : 'Asset approved',
       })
+
+      // Send email notification if client email exists
+      if (asset?.client_email) {
+        sendReviewNotification(asset.client_email)
+      }
+
     } catch (error) {
       console.error('Error updating asset status:', error)
       // Revert optimistic update
@@ -171,6 +187,37 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
       })
     } finally {
       setProcessingAssetId(null)
+    }
+  }
+
+  async function sendReviewNotification(clientEmail: string) {
+    try {
+      setSendingNotification(true)
+      console.log(`📧 Sending review notification to ${clientEmail}...`)
+
+      const response = await fetch('/api/send-review-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientEmail,
+          projectId
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.warn('⚠️  Failed to send notification:', errorData.error)
+        // Don't throw - notification failure shouldn't break the workflow
+      } else {
+        console.log('✅ Review notification sent successfully')
+      }
+    } catch (error) {
+      console.error('Error sending notification:', error)
+      // Silent fail - notification is optional
+    } finally {
+      setSendingNotification(false)
     }
   }
 
@@ -186,6 +233,21 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
       setRejectDialogOpen(false)
       setAssetToReject(null)
       setRejectionReason('')
+    }
+  }
+
+  function handleApproveClick(asset: Asset) {
+    setAssetToApprove(asset)
+    setApprovalRemark('')
+    setApproveDialogOpen(true)
+  }
+
+  async function handleApproveConfirm() {
+    if (assetToApprove) {
+      await updateAssetStatus(assetToApprove.id, 'approved', approvalRemark)
+      setApproveDialogOpen(false)
+      setAssetToApprove(null)
+      setApprovalRemark('')
     }
   }
 
@@ -306,6 +368,18 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                               <p className="text-sm text-gray-500">Submitted response</p>
                               {getStatusBadge(asset.status)}
                             </div>
+                            {/* Display approval remark if approved */}
+                            {asset.status === 'approved' && asset.approval_remark && (
+                              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                                <div className="flex items-start gap-2">
+                                  <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-green-900">Approval Note:</p>
+                                    <p className="text-sm text-green-800 mt-1">{asset.approval_remark}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             {/* Display rejection reason if rejected */}
                             {asset.status === 'rejected' && asset.rejection_reason && (
                               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -363,6 +437,19 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                               </div>
                             </div>
 
+                            {/* Display approval remark if approved */}
+                            {asset.status === 'approved' && asset.approval_remark && (
+                              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                                <div className="flex items-start gap-2">
+                                  <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-green-900">Approval Note:</p>
+                                    <p className="text-sm text-green-800 mt-1">{asset.approval_remark}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Display rejection reason if rejected */}
                             {asset.status === 'rejected' && asset.rejection_reason && (
                               <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -407,20 +494,11 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                               size="sm"
                               variant="default"
                               className="flex-1 bg-green-600 hover:bg-green-700"
-                              onClick={() => updateAssetStatus(asset.id, 'approved')}
+                              onClick={() => handleApproveClick(asset)}
                               disabled={processingAssetId === asset.id}
                             >
-                              {processingAssetId === asset.id ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                  Approving...
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Approve
-                                </>
-                              )}
+                              <Check className="h-4 w-4 mr-1" />
+                              Approve
                             </Button>
                             <Button
                               size="sm"
@@ -507,6 +585,61 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                 <>
                   <X className="h-4 w-4 mr-2" />
                   Reject Asset
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Asset</DialogTitle>
+            <DialogDescription>
+              You can add an optional note for {assetToApprove?.file_name || 'this submission'}.
+              This note will be visible to the client in their notification email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="e.g., Great work! This is perfect for our needs, Looks good! Approved for use..."
+              value={approvalRemark}
+              onChange={(e) => setApprovalRemark(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Optional: Leave blank to approve without a note
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setApproveDialogOpen(false)
+                setAssetToApprove(null)
+                setApprovalRemark('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleApproveConfirm}
+              disabled={processingAssetId === assetToApprove?.id}
+            >
+              {processingAssetId === assetToApprove?.id ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Approving...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Approve Asset
                 </>
               )}
             </Button>

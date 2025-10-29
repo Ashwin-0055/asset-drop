@@ -156,6 +156,8 @@ export interface Database {
           uploaded_by: string
           metadata: Json | null
           rejection_reason: string | null
+          approval_remark: string | null
+          client_email: string | null
           created_at: string
           updated_at: string
         }
@@ -171,6 +173,8 @@ export interface Database {
           uploaded_by?: string
           metadata?: Json | null
           rejection_reason?: string | null
+          approval_remark?: string | null
+          client_email?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -186,6 +190,8 @@ export interface Database {
           uploaded_by?: string
           metadata?: Json | null
           rejection_reason?: string | null
+          approval_remark?: string | null
+          client_email?: string | null
           created_at?: string
           updated_at?: string
         }
