@@ -34,23 +34,43 @@ export default function BuilderPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     params.then(p => {
-      setProjectId(p.id);
+      // Load project - will set correct UUID in loadProject
       loadProject(p.id);
     });
   }, []);
 
   async function loadProject(id: string) {
     try {
-      // Load project
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Load project - handle both UUID and shareable_link_id
+      // Try UUID first
+      let projectData, projectError;
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+      if (isUUID) {
+        const result = await supabase
+          .from('projects')
+          .select('*')
+          .eq('id', id)
+          .single();
+        projectData = result.data;
+        projectError = result.error;
+      } else {
+        // If not a UUID, try shareable_link_id
+        const result = await supabase
+          .from('projects')
+          .select('*')
+          .eq('shareable_link_id', id)
+          .single();
+        projectData = result.data;
+        projectError = result.error;
+      }
 
       if (projectError) throw projectError;
 
       setProject(projectData);
+      // IMPORTANT: Always use the actual UUID from the database, not the URL param
+      setProjectId(projectData.id);
       setProjectName(projectData.name);
       setClientName(projectData.client_name || '');
       setDescription(projectData.description || '');
