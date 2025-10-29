@@ -7,9 +7,27 @@ When clicking magic link from email, you get redirected to:
 https://asset-drop.vercel.app/?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired
 ```
 
+## ⚠️ IMPORTANT: Use Your PERMANENT Vercel URL!
+
+**Are you seeing the URL change after every deployment?**
+
+```
+❌ asset-drop-abc123.vercel.app (changes every deploy)
+❌ asset-drop-def456.vercel.app (changes every deploy)
+✅ asset-drop.vercel.app (PERMANENT - use this!)
+```
+
+**Vercel gives you TWO types of URLs:**
+1. **Deployment URLs** (temporary, with random suffix) - ❌ DON'T USE THESE
+2. **Production URL** (permanent, no random suffix) - ✅ USE THIS ONE
+
+**Find your permanent URL:** Vercel Dashboard → Settings → Domains
+
+**See VERCEL_PERMANENT_URL.md for complete guide on finding and using your permanent URL**
+
 ## ✅ Solution
 
-Your Supabase project doesn't recognize your Vercel domain. You need to configure Supabase to allow authentication from your Vercel URL.
+Your Supabase project doesn't recognize your Vercel domain. You need to configure Supabase to allow authentication from your **PERMANENT** Vercel URL.
 
 ---
 
@@ -20,17 +38,25 @@ Your Supabase project doesn't recognize your Vercel domain. You need to configur
 1. **Go to your Supabase Dashboard:**
    - Visit: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/auth/url-configuration
 
-2. **Update Site URL:**
+2. **Find your PERMANENT Vercel URL first:**
+   - Go to Vercel Dashboard → Settings → Domains
+   - Look for URL WITHOUT random characters
+   - ✅ Example: `asset-drop.vercel.app`
+   - ❌ NOT: `asset-drop-abc123.vercel.app`
+
+3. **Update Site URL:**
    - Find "Site URL" field
    - Change from `http://localhost:3000`
-   - To: `https://your-vercel-domain.vercel.app`
+   - To: `https://asset-drop.vercel.app` (your PERMANENT URL)
    - Click "Save"
 
    **Example:**
    ```
    Before: http://localhost:3000
-   After:  https://asset-drop.vercel.app
+   After:  https://asset-drop.vercel.app (permanent URL only!)
    ```
+
+   **⚠️ CRITICAL:** Do NOT use deployment-specific URLs like `asset-drop-xyz123.vercel.app`!
 
 ### Step 2: Add Redirect URLs
 
