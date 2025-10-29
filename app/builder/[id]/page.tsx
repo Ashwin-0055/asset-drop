@@ -240,6 +240,9 @@ export default function BuilderPage({ params }: { params: Promise<{ id: string }
 
       // Insert new form fields
       if (fields.length > 0) {
+        // UUID regex pattern (8-4-4-4-12 format)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
         const formFieldsToInsert = fields.map((field, index) => {
           const fieldData: any = {
             project_id: projectId,
@@ -250,21 +253,32 @@ export default function BuilderPage({ params }: { params: Promise<{ id: string }
             field_order: index,
           };
 
-          // Only include ID if it's already a valid UUID (from database)
-          // Otherwise let database auto-generate UUID
-          if (field.id && !field.id.startsWith('toolbox-') && field.id.includes('-')) {
+          // Only include ID if it's a valid UUID (from database)
+          // Test with proper UUID regex to avoid including nanoid IDs
+          if (field.id && uuidRegex.test(field.id)) {
+            console.log(`✅ Preserving UUID for field "${field.label}":`, field.id);
             fieldData.id = field.id;
+          } else if (field.id) {
+            console.log(`⚠️  Skipping non-UUID ID for field "${field.label}":`, field.id);
           }
 
           return fieldData;
         });
+
+        console.log('📝 Inserting form fields:', formFieldsToInsert);
 
         const { error: insertError } = await supabase
           .from('form_fields')
           .insert(formFieldsToInsert);
 
         if (insertError) {
-          console.error('Insert error:', insertError);
+          console.error('❌ Insert error:', insertError);
+          console.error('Error details:', {
+            message: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint
+          });
           throw insertError;
         }
       }
@@ -276,11 +290,23 @@ export default function BuilderPage({ params }: { params: Promise<{ id: string }
 
       // Reload to get fresh data
       await loadProject(projectId);
-    } catch (error) {
-      console.error('Error saving form:', error);
+    } catch (error: any) {
+      console.error('❌ Error saving form:', error);
+
+      // Extract detailed error message
+      let errorMessage = 'Failed to save form';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      // Log full error for debugging
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+
       toast({
         title: 'Error',
-        description: 'Failed to save form',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
