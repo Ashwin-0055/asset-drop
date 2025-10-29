@@ -6,7 +6,16 @@ import type { Asset, FormField } from '@/types/database.types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Download, Eye, FileIcon, Image, Video, Music, Loader2 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Check, X, Download, Eye, FileIcon, Image, Video, Music, Loader2, AlertCircle } from 'lucide-react'
 import { formatFileSize, formatRelativeTime } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 
@@ -27,6 +36,9 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
   const [processingAssetId, setProcessingAssetId] = useState<string | null>(null)
   const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null)
   const [optimisticAssets, setOptimisticAssets] = useOptimistic(assets)
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+  const [assetToReject, setAssetToReject] = useState<Asset | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   useEffect(() => {
     loadAssets()
@@ -76,7 +88,7 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
     setGroupedAssets(grouped)
   }
 
-  async function updateAssetStatus(assetId: string, status: 'approved' | 'rejected') {
+  async function updateAssetStatus(assetId: string, status: 'approved' | 'rejected', reason?: string) {
     setProcessingAssetId(assetId)
 
     // Get the asset data before updating
@@ -111,16 +123,25 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
         }
       }
 
-      // Update status in database
+      // Update status in database (with rejection reason if provided)
+      const updateData: any = {
+        status,
+        updated_at: new Date().toISOString()
+      }
+
+      if (status === 'rejected' && reason) {
+        updateData.rejection_reason = reason
+      }
+
       const { error } = await supabase
         .from('assets')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update(updateData)
         .eq('id', assetId)
 
       if (error) throw error
 
       // Update actual state
-      setAssets(assets.map(a => a.id === assetId ? { ...a, status } : a))
+      setAssets(assets.map(a => a.id === assetId ? { ...a, status, rejection_reason: reason } : a))
 
       // Log activity
       await supabase.from('activity_log').insert({
@@ -128,7 +149,8 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
         action_type: status === 'approved' ? 'asset_approved' : 'asset_rejected',
         action_details: {
           asset_id: assetId,
-          deleted_from_drive: status === 'rejected' && asset?.google_drive_file_id !== 'text-response'
+          deleted_from_drive: status === 'rejected' && asset?.google_drive_file_id !== 'text-response',
+          rejection_reason: reason || null
         },
       })
 
@@ -149,6 +171,21 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
       })
     } finally {
       setProcessingAssetId(null)
+    }
+  }
+
+  function handleRejectClick(asset: Asset) {
+    setAssetToReject(asset)
+    setRejectionReason('')
+    setRejectDialogOpen(true)
+  }
+
+  async function handleRejectConfirm() {
+    if (assetToReject) {
+      await updateAssetStatus(assetToReject.id, 'rejected', rejectionReason)
+      setRejectDialogOpen(false)
+      setAssetToReject(null)
+      setRejectionReason('')
     }
   }
 
@@ -269,6 +306,18 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                               <p className="text-sm text-gray-500">Submitted response</p>
                               {getStatusBadge(asset.status)}
                             </div>
+                            {/* Display rejection reason if rejected */}
+                            {asset.status === 'rejected' && asset.rejection_reason && (
+                              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-900">Rejection Reason:</p>
+                                    <p className="text-sm text-red-800 mt-1">{asset.rejection_reason}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             <div className="bg-gray-50 rounded p-3 mb-3 max-h-48 overflow-y-auto">
                               {field.field_type === 'code_snippet' ? (
                                 <pre className="text-sm font-mono whitespace-pre-wrap break-words">
@@ -313,6 +362,19 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Display rejection reason if rejected */}
+                            {asset.status === 'rejected' && asset.rejection_reason && (
+                              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-900">Rejection Reason:</p>
+                                    <p className="text-sm text-red-800 mt-1">{asset.rejection_reason}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
                             <div className="flex gap-2 mt-4">
                               <Button
@@ -364,20 +426,11 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
                               size="sm"
                               variant="destructive"
                               className="flex-1"
-                              onClick={() => updateAssetStatus(asset.id, 'rejected')}
+                              onClick={() => handleRejectClick(asset)}
                               disabled={processingAssetId === asset.id}
                             >
-                              {processingAssetId === asset.id ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                  Rejecting...
-                                </>
-                              ) : (
-                                <>
-                                  <X className="h-4 w-4 mr-1" />
-                                  Reject
-                                </>
-                              )}
+                              <X className="h-4 w-4 mr-1" />
+                              Reject
                             </Button>
                           </div>
                         )}
@@ -406,6 +459,60 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Rejection Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Asset</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this {assetToReject?.file_name || 'submission'}.
+              This will help the client understand why it was rejected.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="e.g., Image resolution is too low, incorrect file format, content doesn't match requirements..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Optional: Leave blank to reject without a specific reason
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRejectDialogOpen(false)
+                setAssetToReject(null)
+                setRejectionReason('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectConfirm}
+              disabled={processingAssetId === assetToReject?.id}
+            >
+              {processingAssetId === assetToReject?.id ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Reject Asset
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
