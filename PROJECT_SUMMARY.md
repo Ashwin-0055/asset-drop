@@ -4,7 +4,7 @@
 
 **Build Date**: October 10, 2025
 
-**Last Updated**: October 25, 2025 (Production Deployment & Token Refresh Fix)
+**Last Updated**: October 29, 2025 (Email Notifications & Asset Review System)
 
 **Dev Server**: Running on http://localhost:3000
 
@@ -323,6 +323,129 @@ AssetDrop is a fully functional, production-ready asset collection platform that
 
 ---
 
+### Session 5 - Email Notifications & Asset Review System:
+
+**36. Form Builder UUID Validation Errors** ✅
+- **Problem**: Form publishing failed with "invalid input syntax for type uuid" 400 error
+- **Root Cause**: Builder receiving shareable_link_id (nanoid) in URL instead of project UUID
+- **Solution**: Enhanced builder to detect and handle both UUID and shareable_link_id formats
+- **Fixed Files**: `app/builder/[id]/page.tsx:138-176`
+- **Features**:
+  - UUID regex validation (proper 8-4-4-4-12 format check)
+  - Queries by shareable_link_id if non-UUID detected
+  - Always uses actual project UUID for database operations
+  - Works with both `/builder/uuid` and `/builder/nanoid` URLs
+
+**37. Upload Route Error Logging** ✅
+- **Problem**: 500 errors during file uploads with no visibility into failure point
+- **Solution**: Added comprehensive logging at every step of upload process
+- **Fixed Files**: `app/api/upload/route.ts:15-171`
+- **Features**:
+  - Service role key configuration check
+  - Request details logging (file name, size, project ID)
+  - Token verification and expiry logging
+  - AssetDrop folder creation tracking
+  - Project folder status logging
+  - File buffer conversion verification
+  - Google Drive upload progress
+  - Database insertion logging
+  - Activity log creation tracking
+
+**38. Form Field UUID Validation** ✅
+- **Problem**: Form field save failing with 400 error - nanoid IDs mistaken for UUIDs
+- **Root Cause**: UUID detection used simple dash check: `field.id.includes('-')` which matched nanoids like "HzW1v55jGgzMNmTJV-9tQ"
+- **Solution**: Implemented proper UUID regex validation
+- **Fixed Files**: `app/builder/[id]/page.tsx:244-283`
+- **Features**:
+  - Proper UUID regex: `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`
+  - Logs UUID preservation vs skipping
+  - Enhanced error logging with full Supabase error details
+  - Improved user-facing error messages in toast
+
+**39. Rejection Reason Feature** ✅
+- **Problem**: No way to provide feedback when rejecting client uploads
+- **Solution**: Added rejection reason dialog and display system
+- **Database**: Migration 003_add_rejection_reason.sql
+- **Fixed Files**:
+  - `supabase/migrations/003_add_rejection_reason.sql` - Added rejection_reason column
+  - `components/project/assets-tab.tsx` - Rejection dialog and display
+  - `types/database.types.ts` - Added rejection_reason field
+- **Features**:
+  - Dialog opens when clicking "Reject" button
+  - Optional text area for rejection reason
+  - Red info box displays reason on rejected assets
+  - Reasons stored in database and activity log
+  - Works for both file uploads and text responses
+
+**40. Email Notification System (Phase 1)** ✅
+- **Problem**: Rejection reasons stored but never reach client - no communication loop
+- **Solution**: Implemented comprehensive email notification system
+- **Database**: Migration 004_add_approval_remarks_and_email.sql
+- **New Features**:
+  - Approval remarks (not just rejection reasons)
+  - Client email storage
+  - Automatic email notifications
+  - Professional HTML email templates
+  - Resend email service integration (100 free emails/day)
+
+- **Database Changes**:
+  - Added `approval_remark` column (TEXT, nullable) for positive feedback
+  - Added `client_email` column (TEXT, nullable) to know who to notify
+  - Index on client_email for faster lookups
+  - Migration: `004_add_approval_remarks_and_email.sql`
+
+- **Email Infrastructure**:
+  - Installed Resend npm package
+  - Created `lib/email/resend.ts` - Email service configuration
+  - Created `lib/email/templates.tsx` - Beautiful HTML/text templates
+  - Created `app/api/send-review-notification/route.ts` - Email sending API
+
+- **UI Improvements**:
+  - Approval dialog with optional remark field
+  - Rejection dialog with optional reason field (enhanced)
+  - Green info boxes for approval remarks on assets
+  - Red info boxes for rejection reasons on assets
+  - Both remarks visible in dashboard and sent to client
+
+- **Email Template Features**:
+  - Professional gradient header with AssetDrop branding
+  - Summary count (approved/rejected)
+  - Green section for approved assets with optional remarks
+  - Red section for rejected assets with reasons
+  - Re-upload link button for rejected files
+  - Plain text fallback
+  - Mobile responsive design
+
+- **Workflow**:
+  1. User clicks Approve/Reject on asset
+  2. Dialog opens for optional remark/reason
+  3. User confirms action
+  4. Asset status updated in database
+  5. Email automatically sent to client (if email exists)
+  6. Activity log includes remark/reason
+
+- **Fixed Files**:
+  - `components/project/assets-tab.tsx` - Approval/rejection dialogs, auto-send emails
+  - `types/database.types.ts` - Added approval_remark and client_email fields
+  - `package.json` - Added resend dependency
+  - `.env.example` - Added RESEND_API_KEY configuration
+
+- **Documentation**:
+  - Created `FEATURE_EMAIL_NOTIFICATIONS.md` - Complete setup guide with troubleshooting
+
+- **Phase 1 Status**: ✅ Complete (email infrastructure ready)
+- **Phase 2 Pending**: Collection form email input, client portal history, re-upload functionality
+
+**41. Vercel Build Failure - Missing Resend API Key** ✅
+- **Problem**: Vercel build failing with "Missing API key. Pass it to constructor new Resend("re_123")"
+- **Root Cause**: Resend initialized during build before environment variables loaded
+- **Solution**: Added fallback dummy key for build time
+- **Fixed Files**: `lib/email/resend.ts:6`
+- **Fix**: `new Resend(process.env.RESEND_API_KEY || 'dummy_key_for_build')`
+- **Impact**: Build succeeds on Vercel, runtime checks prevent actual usage without real key
+
+---
+
 ## ✨ Completed Features
 
 ### Core Functionality
@@ -332,8 +455,10 @@ AssetDrop is a fully functional, production-ready asset collection platform that
 - ✅ Custom Asset Collection Portals
 - ✅ File Upload to Google Drive
 - ✅ Asset Approval Workflow
-- ✅ **Auto-Delete Rejected Files from Drive** (NEW)
-- ✅ **Auto-Delete Project Folders from Drive** (NEW)
+- ✅ **Auto-Delete Rejected Files from Drive**
+- ✅ **Auto-Delete Project Folders from Drive**
+- ✅ **Email Notifications for Asset Reviews** (NEW)
+- ✅ **Approval Remarks & Rejection Reasons** (NEW)
 - ✅ Activity Timeline & Audit Logs
 - ✅ Password-Protected Links
 - ✅ Link Expiration Management
@@ -448,18 +573,24 @@ assetdrop/
 │   ├── google-drive/
 │   │   ├── oauth.ts                       ✅ OAuth helpers
 │   │   └── api.ts                         ✅ Drive API
+│   ├── email/
+│   │   ├── resend.ts                      ✅ Email service
+│   │   └── templates.tsx                  ✅ Email templates
 │   └── utils.ts                           ✅ Utility functions
 ├── types/
 │   ├── database.types.ts                  ✅ Database types
 │   └── builder.ts                         ✅ Builder types
 ├── supabase/migrations/
 │   ├── 001_initial_schema.sql             ✅ Database schema
-│   └── 002_add_metadata_column.sql        ✅ Metadata migration
+│   ├── 002_add_metadata_column.sql        ✅ Metadata migration
+│   ├── 003_add_rejection_reason.sql       ✅ Rejection reasons
+│   └── 004_add_approval_remarks_and_email.sql ✅ Email notifications
 ├── .env.example                           ✅ Env template
 ├── .env.local                             ⚠️ Not in repo (local only)
 ├── .gitignore                             ✅ Git ignore
 ├── README.md                              ✅ Documentation
 ├── SETUP.md                               ✅ Setup guide
+├── FEATURE_EMAIL_NOTIFICATIONS.md         ✅ Email setup guide
 ├── components.json                        ✅ shadcn config
 ├── middleware.ts                          ✅ Next.js middleware
 ├── next.config.js                         ✅ Next config
@@ -469,7 +600,7 @@ assetdrop/
 └── tsconfig.json                          ✅ TypeScript config
 ```
 
-**Total Files Created**: 87+ (including all fixes and additions)
+**Total Files Created**: 95+ (including all fixes and additions)
 
 ---
 
@@ -638,10 +769,11 @@ Each field supports:
 
 ## 📦 Dependencies
 
-### Production (22 packages)
+### Production (23 packages)
 - next, react, react-dom
 - @supabase/supabase-js, @supabase/ssr
 - googleapis (Google Drive API for file/folder operations)
+- resend (Email notifications)
 - @tanstack/react-query
 - @dnd-kit/* (core, sortable, utilities)
 - framer-motion
@@ -656,7 +788,7 @@ Each field supports:
 - eslint, eslint-config-next
 - tailwindcss-animate
 
-**Total Bundle**: 453 packages (with transitive deps)
+**Total Bundle**: 568 packages (with transitive deps)
 
 ---
 
@@ -724,7 +856,8 @@ Each field supports:
 ### Phase 2 Features
 - [ ] Team collaboration (multiple users per project)
 - [ ] Custom branding (logo, colors per project)
-- [ ] Email notifications
+- [x] Email notifications (Phase 1 complete - infrastructure ready)
+- [ ] Email notifications Phase 2 (collection form email input, client portal history)
 - [ ] Webhooks for integrations
 - [ ] Bulk actions (approve/reject multiple)
 - [ ] File versioning
@@ -987,16 +1120,16 @@ If you encounter any issues:
 
 ---
 
-*Updated: October 25, 2025 - All systems operational ✅*
+*Updated: October 29, 2025 - All systems operational ✅*
 
-*Latest Session: Production Deployment & Token Refresh Fix*
+*Latest Session: Email Notifications & Asset Review System*
 
-*Total Issues Resolved: 35*
+*Total Issues Resolved: 41*
 
 *Performance Improvements: 60-80% faster dashboard, 40-50% faster navigation*
 
 *Major Improvements: Zero app crashes, graceful error handling, automatic Drive cleanup*
 
-*New Features: Auto-delete rejected files from Drive, auto-delete project folders on deletion*
+*New Features: Email notifications, approval remarks, rejection reasons with client feedback loop*
 
 *End of Build Summary*
