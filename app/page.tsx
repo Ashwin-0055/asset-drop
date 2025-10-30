@@ -203,20 +203,51 @@ export default function LandingPage() {
             <motion.div variants={fadeInUp}>
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl blur-3xl"></div>
-                <Card className="relative p-8 bg-white/80 backdrop-blur">
+                <Card className="relative p-6 bg-white/80 backdrop-blur">
                   <div className="space-y-4">
-                    <div className="h-4 bg-gradient-to-r from-blue-200 to-purple-200 rounded w-3/4"></div>
-                    <div className="h-4 bg-gradient-to-r from-purple-200 to-pink-200 rounded w-1/2"></div>
-                    <div className="space-y-2 pt-4">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-400 rounded"></div>
-                          <div className="flex-1">
-                            <div className="h-3 bg-slate-200 rounded w-3/4 mb-2"></div>
-                            <div className="h-2 bg-slate-100 rounded w-1/2"></div>
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-4 border-b">
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Brand Assets - Q1 2025</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Shared with 3 clients</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-xs text-slate-600">Active</span>
+                      </div>
+                    </div>
+
+                    {/* File List */}
+                    <div className="space-y-2">
+                      {[
+                        { name: "Logo_Package.zip", size: "2.4 MB", icon: "📦", color: "from-blue-400 to-blue-500" },
+                        { name: "Brand_Guidelines.pdf", size: "1.8 MB", icon: "📄", color: "from-purple-400 to-purple-500" },
+                        { name: "Product_Mockups.psd", size: "15.2 MB", icon: "🎨", color: "from-pink-400 to-pink-500" }
+                      ].map((file, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 bg-gradient-to-r from-slate-50 to-slate-100/50 rounded-lg hover:shadow-sm transition-all group">
+                          <div className={`w-10 h-10 bg-gradient-to-br ${file.color} rounded-lg flex items-center justify-center text-xl group-hover:scale-110 transition-transform`}>
+                            {file.icon}
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-slate-900 truncate">{file.name}</div>
+                            <div className="text-xs text-slate-500">{file.size}</div>
+                          </div>
+                          <CheckCircle2 className="w-4 h-4 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                       ))}
+                    </div>
+
+                    {/* Stats Footer */}
+                    <div className="pt-4 border-t flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-4">
+                        <span className="text-slate-600">
+                          <span className="font-semibold text-blue-600">24</span> downloads
+                        </span>
+                        <span className="text-slate-600">
+                          <span className="font-semibold text-purple-600">12</span> views
+                        </span>
+                      </div>
+                      <span className="text-slate-500">Updated 2h ago</span>
                     </div>
                   </div>
                 </Card>

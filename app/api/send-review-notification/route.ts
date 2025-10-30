@@ -13,6 +13,7 @@ import { generateAssetReviewEmailHTML, generateAssetReviewEmailText } from '@/li
 export async function POST(request: NextRequest) {
   try {
     console.log('📧 Processing review notification request...')
+    console.log('⏰ Timestamp:', new Date().toISOString())
 
     // Check if Resend is configured
     if (!process.env.RESEND_API_KEY) {
@@ -24,6 +25,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { clientEmail, projectId } = await request.json()
+
+    console.log('📋 Request params:', { clientEmail, projectId })
 
     if (!clientEmail || !projectId) {
       return NextResponse.json(
@@ -129,14 +132,20 @@ export async function POST(request: NextRequest) {
     })
 
     if (emailResult.error) {
-      console.error('❌ Resend error:', emailResult.error)
+      console.error('❌ Resend error:', JSON.stringify(emailResult.error, null, 2))
+      console.error('❌ Error type:', typeof emailResult.error)
+      console.error('❌ Error name:', emailResult.error?.name)
+      console.error('❌ Error message:', emailResult.error?.message)
       return NextResponse.json(
         { error: 'Failed to send email', details: emailResult.error },
         { status: 500 }
       )
     }
 
-    console.log('✅ Email sent successfully! ID:', emailResult.data?.id)
+    console.log('✅ Email sent successfully!')
+    console.log('📬 Email ID:', emailResult.data?.id)
+    console.log('📨 Sent to:', clientEmail)
+    console.log('📊 Summary: Approved:', approved.length, 'Rejected:', rejected.length)
 
     // Log activity
     await supabase.from('activity_log').insert({
@@ -161,10 +170,22 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error sending review notification:', error)
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('❌ Error type:', typeof error)
+
+    // Provide more detailed error information
+    let errorMessage = 'Failed to send notification'
+    let errorDetails = 'Unknown error'
+
+    if (error instanceof Error) {
+      errorMessage = error.message
+      errorDetails = error.stack || error.message
+    }
+
     return NextResponse.json(
       {
-        error: 'Failed to send notification',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage,
+        details: errorDetails
       },
       { status: 500 }
     )

@@ -36,6 +36,9 @@ export default function ClientPortalPage() {
   const [clientEmail, setClientEmail] = useState('')
   const [submissionHistory, setSubmissionHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
 
   useEffect(() => {
     loadProject()
@@ -178,6 +181,66 @@ export default function ClientPortalPage() {
     }
   }
 
+  // Upload single file with progress tracking
+  function uploadFileWithProgress(
+    file: File,
+    projectId: string,
+    formFieldId: string | null,
+    clientEmail: string
+  ): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('projectId', projectId)
+      formData.append('clientEmail', clientEmail)
+      if (formFieldId) {
+        formData.append('formFieldId', formFieldId)
+      }
+
+      const xhr = new XMLHttpRequest()
+
+      // Track upload progress
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100)
+          setUploadProgress(progress)
+        }
+      }
+
+      // Handle completion
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText)
+            resolve(response)
+          } catch (e) {
+            reject(new Error('Invalid response from server'))
+          }
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText)
+            reject(new Error(errorData.error || errorData.details || 'Upload failed'))
+          } catch (e) {
+            reject(new Error(`Upload failed with status ${xhr.status}`))
+          }
+        }
+      }
+
+      // Handle errors
+      xhr.onerror = () => {
+        reject(new Error('Network error during upload'))
+      }
+
+      xhr.ontimeout = () => {
+        reject(new Error('Upload timed out'))
+      }
+
+      // Send request
+      xhr.open('POST', '/api/upload')
+      xhr.send(formData)
+    })
+  }
+
   function validateForm() {
     // Validate email first (always required)
     if (!clientEmail || !clientEmail.trim()) {
@@ -257,6 +320,22 @@ export default function ClientPortalPage() {
       return uploadedAssets
     }
 
+    // Count total files
+    let fileCount = 0
+    formFields.forEach(field => {
+      if (field.field_type === 'file_upload' ||
+          field.field_type === 'image_gallery' ||
+          field.field_type === 'audio_video') {
+        const files = formValues[field.id] as File[]
+        if (files && files.length > 0) {
+          fileCount += files.length
+        }
+      }
+    })
+
+    setTotalFiles(fileCount)
+    let uploadedCount = 0
+
     for (const field of formFields) {
       if (field.field_type === 'file_upload' ||
           field.field_type === 'image_gallery' ||
@@ -266,6 +345,8 @@ export default function ClientPortalPage() {
         if (!files || files.length === 0) continue
 
         for (const file of files) {
+          uploadedCount++
+          setCurrentFileIndex(uploadedCount)
           // Check file size (warn if > 50MB)
           const fileSizeMB = file.size / (1024 * 1024)
           console.log(`📦 Uploading ${file.name} (${fileSizeMB.toFixed(2)} MB)`)
@@ -274,44 +355,32 @@ export default function ClientPortalPage() {
             console.warn(`⚠️  Large file detected: ${fileSizeMB.toFixed(2)} MB - this may take a while`)
           }
 
-          // Use API route to upload file
-          const formData = new FormData()
-          formData.append('file', file)
-          formData.append('projectId', projectId)
-          formData.append('clientEmail', clientEmail)
-          if (field.id) {
-            formData.append('formFieldId', field.id)
-          }
+          // Reset progress for this file
+          setUploadProgress(0)
 
           try {
-            const response = await fetch('/api/upload', {
-              method: 'POST',
-              body: formData,
-            })
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}))
-              console.error(`❌ Failed to upload ${file.name}:`, errorData)
-
-              // Handle specific error: Google Drive not connected
-              if (errorData.error?.includes('Google Drive not connected')) {
-                throw new Error('The project owner needs to connect their Google Drive account before files can be uploaded. Please contact them to set this up.')
-              }
-
-              // Generic error
-              throw new Error(`Failed to upload ${file.name}: ${errorData.error || errorData.details || 'Unknown error'}`)
-            }
-
-            const asset = await response.json()
+            // Use XMLHttpRequest for upload progress tracking
+            const asset = await uploadFileWithProgress(file, projectId, field.id, clientEmail)
             uploadedAssets.push(asset)
             console.log(`✅ Successfully uploaded ${file.name}`)
-          } catch (fetchError: any) {
-            // Handle network errors specifically
-            if (fetchError.message === 'Failed to fetch' || fetchError.name === 'TypeError') {
-              console.error(`❌ Network error uploading ${file.name}:`, fetchError)
+
+            // Reset progress after successful upload
+            setUploadProgress(100)
+          } catch (uploadError: any) {
+            console.error(`❌ Failed to upload ${file.name}:`, uploadError)
+
+            // Handle specific errors
+            if (uploadError.message?.includes('Google Drive')) {
+              throw new Error('The project owner needs to connect their Google Drive account before files can be uploaded. Please contact them to set this up.')
+            }
+
+            // Handle network errors
+            if (uploadError.message?.includes('Network error') || uploadError.message?.includes('connection')) {
               throw new Error(`Network connection lost while uploading ${file.name}. This can happen with large files or slow connections. Please try again with a smaller file or check your internet connection.`)
             }
-            throw fetchError
+
+            // Generic error
+            throw new Error(`Failed to upload ${file.name}: ${uploadError.message || 'Unknown error'}`)
           }
         }
       }
@@ -832,13 +901,31 @@ export default function ClientPortalPage() {
                   type="submit"
                   size="lg"
                   disabled={submitting}
-                  className="min-w-[200px]"
+                  className="min-w-[250px]"
                 >
                   {submitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
+                    <div className="flex flex-col items-center w-full">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>
+                          {totalFiles > 0 && currentFileIndex > 0
+                            ? `Uploading file ${currentFileIndex} of ${totalFiles}`
+                            : 'Uploading...'
+                          }
+                        </span>
+                      </div>
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                      {uploadProgress > 0 && (
+                        <span className="text-xs mt-1">{uploadProgress}%</span>
+                      )}
+                    </div>
                   ) : (
                     <>
                       <Upload className="h-4 w-4 mr-2" />
