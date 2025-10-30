@@ -137,26 +137,38 @@ export async function POST(request: NextRequest) {
     })
 
     if (emailResult.error) {
-      console.error('❌ Resend error:', JSON.stringify(emailResult.error, null, 2))
-      console.error('❌ Error type:', typeof emailResult.error)
-      console.error('❌ Error name:', emailResult.error?.name)
-      console.error('❌ Error message:', emailResult.error?.message)
+      console.error('❌ Resend API Error Details:')
+      console.error('   Full error object:', JSON.stringify(emailResult.error, null, 2))
+      console.error('   Error type:', typeof emailResult.error)
+      console.error('   Error name:', emailResult.error?.name)
+      console.error('   Error message:', emailResult.error?.message)
 
       // Provide specific error messages for common issues
-      let userMessage = 'Failed to send email'
-      const errorMsg = emailResult.error?.message || ''
+      let userMessage = 'Failed to send email via Resend'
+      const errorMsg = (emailResult.error?.message || '').toLowerCase()
 
-      if (errorMsg.includes('API key') || errorMsg.includes('Invalid') || errorMsg.includes('authentication')) {
-        userMessage = 'Email service authentication failed. Please verify your RESEND_API_KEY in Vercel environment variables.'
-        console.error('💡 Tip: Get a valid API key from https://resend.com/api-keys')
-      } else if (errorMsg.includes('rate limit')) {
-        userMessage = 'Email rate limit exceeded. Please try again later.'
-      } else if (errorMsg.includes('email')) {
-        userMessage = `Invalid email address: ${clientEmail}`
+      // Check for specific Resend API errors
+      if (errorMsg.includes('api') && (errorMsg.includes('key') || errorMsg.includes('token') || errorMsg.includes('auth'))) {
+        userMessage = 'Email service authentication failed. RESEND_API_KEY is missing or invalid.'
+        console.error('💡 Action required: Set a valid RESEND_API_KEY in Vercel environment variables')
+        console.error('🔗 Get your API key from: https://resend.com/api-keys')
+      } else if (errorMsg.includes('rate') && errorMsg.includes('limit')) {
+        userMessage = 'Email rate limit exceeded. Please try again in a few minutes.'
+      } else if (errorMsg.includes('recipient') || errorMsg.includes('to address')) {
+        userMessage = `Invalid recipient email address: ${clientEmail}`
+      } else if (errorMsg.includes('from address') || errorMsg.includes('sender')) {
+        userMessage = 'Invalid sender email. Using onboarding@resend.dev which should work in testing.'
+      } else {
+        // For any other error, show the actual Resend error message
+        userMessage = `Resend API error: ${emailResult.error?.message || 'Unknown error'}`
       }
 
       return NextResponse.json(
-        { error: userMessage, details: emailResult.error },
+        {
+          error: userMessage,
+          details: emailResult.error,
+          resendErrorMessage: emailResult.error?.message
+        },
         { status: 500 }
       )
     }

@@ -220,7 +220,12 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.warn('⚠️  Failed to send notification:', errorData.error)
+        console.error('❌ Email notification failed!')
+        console.error('   Status:', response.status)
+        console.error('   Error:', errorData.error)
+        console.error('   Details:', errorData.details)
+        console.error('   Resend message:', errorData.resendErrorMessage)
+        console.error('📋 Full error response:', JSON.stringify(errorData, null, 2))
         // Don't throw - notification failure shouldn't break the workflow
       } else {
         console.log('✅ Review notification sent successfully')

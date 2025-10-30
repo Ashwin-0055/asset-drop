@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Info, Settings } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
@@ -12,16 +12,6 @@ const navItems = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-  },
-  {
-    name: 'Info',
-    href: '/dashboard/info',
-    icon: Info,
-  },
-  {
-    name: 'Settings',
-    href: '/dashboard/settings',
-    icon: Settings,
   },
 ]
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, LogOut, Settings as SettingsIcon, User as UserIcon, Cloud, Unplug, AlertTriangle } from 'lucide-react'
+import { Search, LogOut, User as UserIcon, Cloud, Unplug, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { useGoogleDrive } from '@/hooks/useGoogleDrive'
@@ -204,13 +204,6 @@ export function Header({ onSearch, className }: HeaderProps) {
                   </DropdownMenuItem>
                 )}
 
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings" className="cursor-pointer">
-                    <SettingsIcon className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
