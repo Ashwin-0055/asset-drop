@@ -128,6 +128,12 @@ export async function POST(request: NextRequest) {
     // Send email via Resend
     console.log('📤 Sending email via Resend...')
 
+    // NOTE: Using onboarding@resend.dev for testing
+    // ⚠️  IMPORTANT: This only works with your registered Resend email address
+    // To send to ANY email address:
+    //   1. Verify a domain at https://resend.com/domains
+    //   2. Replace 'onboarding@resend.dev' with 'noreply@yourdomain.com'
+    //   3. Example: from: 'AssetDrop <noreply@assetdrop.com>'
     const emailResult = await resend.emails.send({
       from: 'AssetDrop <onboarding@resend.dev>',
       to: clientEmail,
@@ -148,7 +154,15 @@ export async function POST(request: NextRequest) {
       const errorMsg = (emailResult.error?.message || '').toLowerCase()
 
       // Check for specific Resend API errors
-      if (errorMsg.includes('api') && (errorMsg.includes('key') || errorMsg.includes('token') || errorMsg.includes('auth'))) {
+      if (errorMsg.includes('verify a domain') || errorMsg.includes('testing emails')) {
+        userMessage = 'Domain verification required: Resend only allows sending to your registered email in testing mode. Please verify a domain at resend.com/domains to send to any email address.'
+        console.error('🚫 Resend Domain Restriction:')
+        console.error('   You can only send to your own email address until you verify a domain')
+        console.error('📝 Steps to fix:')
+        console.error('   1. Go to https://resend.com/domains')
+        console.error('   2. Add and verify your domain')
+        console.error('   3. Update the "from" email in the code to use your domain')
+      } else if (errorMsg.includes('api') && (errorMsg.includes('key') || errorMsg.includes('token') || errorMsg.includes('auth'))) {
         userMessage = 'Email service authentication failed. RESEND_API_KEY is missing or invalid.'
         console.error('💡 Action required: Set a valid RESEND_API_KEY in Vercel environment variables')
         console.error('🔗 Get your API key from: https://resend.com/api-keys')

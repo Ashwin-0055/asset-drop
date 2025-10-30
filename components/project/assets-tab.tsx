@@ -226,9 +226,32 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
         console.error('   Details:', errorData.details)
         console.error('   Resend message:', errorData.resendErrorMessage)
         console.error('📋 Full error response:', JSON.stringify(errorData, null, 2))
+
+        // Show user-friendly toast notification
+        const errorMsg = errorData.resendErrorMessage || errorData.error || 'Unknown error'
+
+        if (errorMsg.toLowerCase().includes('verify a domain') || errorMsg.toLowerCase().includes('testing emails')) {
+          toast({
+            title: 'Email Verification Required',
+            description: 'Resend requires domain verification to send emails. For now, emails can only be sent to your registered Resend email address. Verify a domain at resend.com/domains to enable sending to any email.',
+            variant: 'destructive',
+          })
+        } else {
+          toast({
+            title: 'Email Notification Failed',
+            description: errorData.error || 'Failed to send email notification',
+            variant: 'destructive',
+          })
+        }
+
         // Don't throw - notification failure shouldn't break the workflow
       } else {
         console.log('✅ Review notification sent successfully')
+
+        toast({
+          title: 'Email Sent',
+          description: `Review notification sent to ${clientEmail}`,
+        })
       }
     } catch (error) {
       console.error('Error sending notification:', error)
