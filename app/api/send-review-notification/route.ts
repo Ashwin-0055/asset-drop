@@ -18,8 +18,13 @@ export async function POST(request: NextRequest) {
     // Check if Resend is configured
     if (!process.env.RESEND_API_KEY) {
       console.error('❌ RESEND_API_KEY is not configured')
+      console.error('📝 Set RESEND_API_KEY in your Vercel environment variables')
+      console.error('🔗 Get your API key from: https://resend.com/api-keys')
       return NextResponse.json(
-        { error: 'Email service not configured' },
+        {
+          error: 'Email service not configured',
+          details: 'RESEND_API_KEY environment variable is missing. Please configure it in your Vercel project settings.'
+        },
         { status: 500 }
       )
     }
@@ -136,8 +141,22 @@ export async function POST(request: NextRequest) {
       console.error('❌ Error type:', typeof emailResult.error)
       console.error('❌ Error name:', emailResult.error?.name)
       console.error('❌ Error message:', emailResult.error?.message)
+
+      // Provide specific error messages for common issues
+      let userMessage = 'Failed to send email'
+      const errorMsg = emailResult.error?.message || ''
+
+      if (errorMsg.includes('API key') || errorMsg.includes('Invalid') || errorMsg.includes('authentication')) {
+        userMessage = 'Email service authentication failed. Please verify your RESEND_API_KEY in Vercel environment variables.'
+        console.error('💡 Tip: Get a valid API key from https://resend.com/api-keys')
+      } else if (errorMsg.includes('rate limit')) {
+        userMessage = 'Email rate limit exceeded. Please try again later.'
+      } else if (errorMsg.includes('email')) {
+        userMessage = `Invalid email address: ${clientEmail}`
+      }
+
       return NextResponse.json(
-        { error: 'Failed to send email', details: emailResult.error },
+        { error: userMessage, details: emailResult.error },
         { status: 500 }
       )
     }
