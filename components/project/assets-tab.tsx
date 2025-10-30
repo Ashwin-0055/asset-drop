@@ -171,9 +171,21 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
           : 'Asset approved',
       })
 
+      // Debug: Check if asset has email
+      console.log('🔍 Asset info:', {
+        assetId: asset?.id,
+        fileName: asset?.file_name,
+        clientEmail: asset?.client_email,
+        hasEmail: !!asset?.client_email
+      })
+
       // Send email notification if client email exists
       if (asset?.client_email) {
+        console.log(`✅ Client email found: ${asset.client_email} - Sending notification...`)
         sendReviewNotification(asset.client_email)
+      } else {
+        console.warn('⚠️  No client email found for this asset - Email notification skipped')
+        console.warn('💡 Tip: New uploads will automatically capture email. Old assets need manual update.')
       }
 
     } catch (error) {
