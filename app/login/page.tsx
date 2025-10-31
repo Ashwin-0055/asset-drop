@@ -141,7 +141,16 @@ export default function LoginPage() {
                   You can close this tab now and continue using the application in the other tab.
                 </p>
                 <Button
-                  onClick={() => window.close()}
+                  onClick={() => {
+                    // Try to close the tab (works if opened by window.open())
+                    window.close()
+                    // If close() didn't work (tab still open after 100ms), redirect to dashboard
+                    setTimeout(() => {
+                      if (!window.closed) {
+                        router.push('/dashboard')
+                      }
+                    }, 100)
+                  }}
                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                 >
                   Close This Tab

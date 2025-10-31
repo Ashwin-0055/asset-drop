@@ -2,7 +2,7 @@
 
 import { useState, memo } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreVertical, Edit, Trash2, Link2, Copy } from 'lucide-react'
+import { MoreVertical, Edit, Trash2, Link2, Copy, AlertTriangle } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import type { Project } from '@/types/database.types'
 import type { ProjectWithStats } from '@/hooks/useProjects'
@@ -16,6 +16,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { useDeleteProject } from '@/hooks/useProjects'
@@ -27,6 +37,8 @@ interface ProjectCardProps {
 
 export const ProjectCard = memo(function ProjectCard({ project, onEdit }: ProjectCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
   const deleteProject = useDeleteProject()
@@ -92,16 +104,13 @@ export const ProjectCard = memo(function ProjectCard({ project, onEdit }: Projec
     }
   }
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
+    setDeleteDialogOpen(true)
+  }
 
-    const confirmMessage = project.google_drive_folder_id
-      ? `Are you sure you want to delete "${project.name}"?\n\nThis will also delete the project folder from Google Drive.`
-      : `Are you sure you want to delete "${project.name}"?`
-
-    if (!confirm(confirmMessage)) {
-      return
-    }
+  const confirmDelete = async () => {
+    setIsDeleting(true)
 
     try {
       const result = await deleteProject.mutateAsync(project.id)
@@ -113,12 +122,16 @@ export const ProjectCard = memo(function ProjectCard({ project, onEdit }: Projec
         title: 'Project deleted',
         description,
       })
+
+      setDeleteDialogOpen(false)
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to delete project. Please try again.',
         variant: 'destructive',
       })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -208,6 +221,61 @@ export const ProjectCard = memo(function ProjectCard({ project, onEdit }: Projec
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-orange-500 mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              Delete "{project.name}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center space-y-2">
+              <p className="text-slate-700">
+                This action cannot be undone. This will permanently delete the project.
+              </p>
+              {project.google_drive_folder_id && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mt-3">
+                  <p className="text-sm font-medium text-yellow-900 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    This will also delete the project folder from Google Drive
+                  </p>
+                </div>
+              )}
+              {project.total_assets > 0 && (
+                <p className="text-sm text-slate-600 mt-2">
+                  This project contains <span className="font-semibold">{project.total_assets} asset{project.total_assets !== 1 ? 's' : ''}</span>
+                </p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:space-x-2">
+            <AlertDialogCancel asChild>
+              <Button variant="outline" disabled={isDeleting} className="flex-1">
+                Cancel
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="flex-1 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Project'
+                )}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 })

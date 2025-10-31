@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useOptimistic } from 'react'
+import { useEffect, useState, useOptimistic, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Asset, FormField } from '@/types/database.types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +18,9 @@ import {
 import { Check, X, Download, Eye, FileIcon, Image, Video, Music, Loader2, AlertCircle } from 'lucide-react'
 import { formatFileSize, formatRelativeTime } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
+import { useReviewTimer } from '@/hooks/useReviewTimer'
+import { ReviewSummaryBanner } from './ReviewSummaryBanner'
+import { SendConfirmationDialog } from './SendConfirmationDialog'
 
 interface AssetsTabProps {
   projectId: string
@@ -43,6 +46,26 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
   const [assetToApprove, setAssetToApprove] = useState<Asset | null>(null)
   const [approvalRemark, setApprovalRemark] = useState('')
   const [sendingNotification, setSendingNotification] = useState(false)
+
+  // Email batching state
+  const [reviewedAssets, setReviewedAssets] = useState<Set<string>>(new Set())
+  const [sendConfirmationOpen, setSendConfirmationOpen] = useState(false)
+
+  // Timer for auto-sending emails
+  const {
+    isActive: isTimerActive,
+    startTimer,
+    resetTimer,
+    stopTimer,
+    formatTimeRemaining,
+    getProgress
+  } = useReviewTimer({
+    onTimerExpire: () => {
+      // When timer expires, show confirmation dialog
+      setSendConfirmationOpen(true)
+    },
+    enabled: reviewedAssets.size > 0
+  })
 
   useEffect(() => {
     loadAssets()
@@ -171,21 +194,24 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
           : 'Asset approved',
       })
 
-      // Debug: Check if asset has email
-      console.log('🔍 Asset info:', {
-        assetId: asset?.id,
-        fileName: asset?.file_name,
-        clientEmail: asset?.client_email,
-        hasEmail: !!asset?.client_email
-      })
-
-      // Send email notification if client email exists
+      // Track reviewed asset for batched email sending
       if (asset?.client_email) {
-        console.log(`✅ Client email found: ${asset.client_email} - Sending notification...`)
-        sendReviewNotification(asset.client_email)
-      } else {
-        console.warn('⚠️  No client email found for this asset - Email notification skipped')
-        console.warn('💡 Tip: New uploads will automatically capture email. Old assets need manual update.')
+        setReviewedAssets(prev => {
+          const updated = new Set(prev)
+          updated.add(assetId)
+          return updated
+        })
+
+        // Start or reset timer (extends session if already reviewing)
+        if (reviewedAssets.size === 0) {
+          // First review - start timer
+          startTimer()
+        } else {
+          // Subsequent review - reset timer (extend session)
+          resetTimer()
+        }
+
+        console.log(`✅ Asset marked for review email - Timer ${reviewedAssets.size === 0 ? 'started' : 'reset'}`)
       }
 
     } catch (error) {
@@ -202,66 +228,75 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
     }
   }
 
-  async function sendReviewNotification(clientEmail: string) {
+  // Send batched review notifications to all clients
+  async function sendBatchedNotifications() {
     try {
       setSendingNotification(true)
-      console.log(`📧 Sending review notification to ${clientEmail}...`)
 
-      const response = await fetch('/api/send-review-notification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clientEmail,
-          projectId
-        })
-      })
+      // Get unique client emails from reviewed assets
+      const reviewedAssetsList = assets.filter(a => reviewedAssets.has(a.id))
+      const clientEmails = [...new Set(reviewedAssetsList.map(a => a.client_email).filter(Boolean))]
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('❌ Email notification failed!')
-        console.error('   Status:', response.status)
-        console.error('   Error:', errorData.error)
-        console.error('   Details:', errorData.details)
-        console.error('   Resend message:', errorData.resendErrorMessage)
-        console.error('📋 Full error response:', JSON.stringify(errorData, null, 2))
+      console.log(`📧 Sending batched notifications to ${clientEmails.length} clients...`)
 
-        // Show user-friendly toast notification
-        const errorMsg = errorData.sendgridErrorMessage || errorData.resendErrorMessage || errorData.error || 'Unknown error'
+      let successCount = 0
+      let failureCount = 0
 
-        if (errorMsg.toLowerCase().includes('not verified') || errorMsg.toLowerCase().includes('sender identity')) {
-          toast({
-            title: 'Sender Email Not Verified',
-            description: 'You need to verify your sender email in SendGrid. Go to SendGrid Settings → Sender Authentication → Single Sender Verification.',
-            variant: 'destructive',
+      // Send email to each client
+      for (const clientEmail of clientEmails) {
+        try {
+          const response = await fetch('/api/send-review-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              clientEmail,
+              projectId
+            })
           })
-        } else if (errorMsg.toLowerCase().includes('verify a domain') || errorMsg.toLowerCase().includes('testing emails')) {
-          toast({
-            title: 'Email Verification Required',
-            description: 'Email service requires verification. Please verify your sender email or domain.',
-            variant: 'destructive',
-          })
-        } else {
-          toast({
-            title: 'Email Notification Failed',
-            description: errorData.error || 'Failed to send email notification',
-            variant: 'destructive',
-          })
+
+          if (response.ok) {
+            successCount++
+            console.log(`✅ Email sent to ${clientEmail}`)
+          } else {
+            failureCount++
+            const errorData = await response.json()
+            console.error(`❌ Failed to send to ${clientEmail}:`, errorData.error)
+          }
+        } catch (error) {
+          failureCount++
+          console.error(`❌ Error sending to ${clientEmail}:`, error)
         }
+      }
 
-        // Don't throw - notification failure shouldn't break the workflow
-      } else {
-        console.log('✅ Review notification sent successfully')
+      // Clear reviewed assets and stop timer
+      setReviewedAssets(new Set())
+      stopTimer()
 
+      // Close confirmation dialog
+      setSendConfirmationOpen(false)
+
+      // Show success toast
+      if (successCount > 0) {
         toast({
-          title: 'Email Sent',
-          description: `Review notification sent to ${clientEmail}`,
+          title: 'Emails Sent Successfully',
+          description: `Review notifications sent to ${successCount} ${successCount === 1 ? 'client' : 'clients'}${failureCount > 0 ? ` (${failureCount} failed)` : ''}`,
+        })
+      } else {
+        toast({
+          title: 'Email Sending Failed',
+          description: 'Failed to send review notifications. Please check your email service configuration.',
+          variant: 'destructive',
         })
       }
     } catch (error) {
-      console.error('Error sending notification:', error)
-      // Silent fail - notification is optional
+      console.error('Error sending batched notifications:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to send review notifications',
+        variant: 'destructive',
+      })
     } finally {
       setSendingNotification(false)
     }
@@ -346,6 +381,59 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
     }
   }
 
+  // Compute review summary for banner and dialog
+  const reviewSummary = useMemo(() => {
+    const reviewedAssetsList = assets.filter(a => reviewedAssets.has(a.id))
+
+    // Group by client email
+    const clientStats: { [email: string]: { approved: number; rejected: number; pending: number } } = {}
+
+    assets.forEach(asset => {
+      if (!asset.client_email) return
+
+      if (!clientStats[asset.client_email]) {
+        clientStats[asset.client_email] = { approved: 0, rejected: 0, pending: 0 }
+      }
+
+      if (reviewedAssets.has(asset.id)) {
+        if (asset.status === 'approved') {
+          clientStats[asset.client_email].approved++
+        } else if (asset.status === 'rejected') {
+          clientStats[asset.client_email].rejected++
+        }
+      } else if (asset.status === 'pending') {
+        clientStats[asset.client_email].pending++
+      }
+    })
+
+    const totalReviewed = reviewedAssetsList.length
+    const totalApproved = reviewedAssetsList.filter(a => a.status === 'approved').length
+    const totalRejected = reviewedAssetsList.filter(a => a.status === 'rejected').length
+    const clientCount = Object.keys(clientStats).filter(email =>
+      clientStats[email].approved + clientStats[email].rejected > 0
+    ).length
+    const totalPending = assets.filter(a => a.status === 'pending' && !reviewedAssets.has(a.id)).length
+
+    return {
+      totalReviewed,
+      totalApproved,
+      totalRejected,
+      clientCount,
+      totalPending,
+      clients: clientStats
+    }
+  }, [assets, reviewedAssets])
+
+  // Prepare client summary for confirmation dialog
+  const clientSummaries = useMemo(() => {
+    return Object.entries(reviewSummary.clients)
+      .filter(([_, stats]) => stats.approved + stats.rejected > 0)
+      .map(([email, stats]) => ({
+        email,
+        ...stats
+      }))
+  }, [reviewSummary])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -361,6 +449,29 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Review Summary Banner */}
+      <ReviewSummaryBanner
+        summary={reviewSummary}
+        timeRemaining={formatTimeRemaining()}
+        timerProgress={getProgress()}
+        onSendNow={() => setSendConfirmationOpen(true)}
+        onResetTimer={resetTimer}
+        isVisible={reviewedAssets.size > 0 && isTimerActive}
+      />
+
+      {/* Send Confirmation Dialog */}
+      <SendConfirmationDialog
+        open={sendConfirmationOpen}
+        onOpenChange={setSendConfirmationOpen}
+        clients={clientSummaries}
+        onConfirm={sendBatchedNotifications}
+        onReviewMore={() => {
+          resetTimer()
+          setSendConfirmationOpen(false)
+        }}
+        isSending={sendingNotification}
+      />
+
       {formFields
         .filter(field =>
           field.field_type === 'file_upload' ||
