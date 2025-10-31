@@ -228,12 +228,18 @@ export function AssetsTab({ projectId, formFields }: AssetsTabProps) {
         console.error('📋 Full error response:', JSON.stringify(errorData, null, 2))
 
         // Show user-friendly toast notification
-        const errorMsg = errorData.resendErrorMessage || errorData.error || 'Unknown error'
+        const errorMsg = errorData.sendgridErrorMessage || errorData.resendErrorMessage || errorData.error || 'Unknown error'
 
-        if (errorMsg.toLowerCase().includes('verify a domain') || errorMsg.toLowerCase().includes('testing emails')) {
+        if (errorMsg.toLowerCase().includes('not verified') || errorMsg.toLowerCase().includes('sender identity')) {
+          toast({
+            title: 'Sender Email Not Verified',
+            description: 'You need to verify your sender email in SendGrid. Go to SendGrid Settings → Sender Authentication → Single Sender Verification.',
+            variant: 'destructive',
+          })
+        } else if (errorMsg.toLowerCase().includes('verify a domain') || errorMsg.toLowerCase().includes('testing emails')) {
           toast({
             title: 'Email Verification Required',
-            description: 'Resend requires domain verification to send emails. For now, emails can only be sent to your registered Resend email address. Verify a domain at resend.com/domains to enable sending to any email.',
+            description: 'Email service requires verification. Please verify your sender email or domain.',
             variant: 'destructive',
           })
         } else {

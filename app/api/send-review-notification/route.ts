@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/server'
-import { resend } from '@/lib/email/resend'
+import { sendgrid } from '@/lib/email/sendgrid'
 import { generateAssetReviewEmailHTML, generateAssetReviewEmailText } from '@/lib/email/templates'
 
 /**
@@ -15,15 +15,29 @@ export async function POST(request: NextRequest) {
     console.log('📧 Processing review notification request...')
     console.log('⏰ Timestamp:', new Date().toISOString())
 
-    // Check if Resend is configured
-    if (!process.env.RESEND_API_KEY) {
-      console.error('❌ RESEND_API_KEY is not configured')
-      console.error('📝 Set RESEND_API_KEY in your Vercel environment variables')
-      console.error('🔗 Get your API key from: https://resend.com/api-keys')
+    // Check if SendGrid is configured
+    if (!process.env.SENDGRID_API_KEY) {
+      console.error('❌ SENDGRID_API_KEY is not configured')
+      console.error('📝 Set SENDGRID_API_KEY in your Vercel environment variables')
+      console.error('🔗 Get your API key from: https://app.sendgrid.com/settings/api_keys')
       return NextResponse.json(
         {
           error: 'Email service not configured',
-          details: 'RESEND_API_KEY environment variable is missing. Please configure it in your Vercel project settings.'
+          details: 'SENDGRID_API_KEY environment variable is missing. Please configure it in your Vercel project settings.'
+        },
+        { status: 500 }
+      )
+    }
+
+    // Check if sender email is configured
+    if (!process.env.SENDGRID_FROM_EMAIL) {
+      console.error('❌ SENDGRID_FROM_EMAIL is not configured')
+      console.error('📝 Set SENDGRID_FROM_EMAIL in your Vercel environment variables')
+      console.error('💡 Example: noreply@yourdomain.com or your@email.com')
+      return NextResponse.json(
+        {
+          error: 'Sender email not configured',
+          details: 'SENDGRID_FROM_EMAIL environment variable is missing. This should be a verified sender email in SendGrid.'
         },
         { status: 500 }
       )
@@ -125,72 +139,82 @@ export async function POST(request: NextRequest) {
     const htmlContent = generateAssetReviewEmailHTML(emailData)
     const textContent = generateAssetReviewEmailText(emailData)
 
-    // Send email via Resend
-    console.log('📤 Sending email via Resend...')
+    // Send email via SendGrid
+    console.log('📤 Sending email via SendGrid...')
 
-    // NOTE: Using onboarding@resend.dev for testing
-    // ⚠️  IMPORTANT: This only works with your registered Resend email address
-    // To send to ANY email address:
-    //   1. Verify a domain at https://resend.com/domains
-    //   2. Replace 'onboarding@resend.dev' with 'noreply@yourdomain.com'
-    //   3. Example: from: 'AssetDrop <noreply@assetdrop.com>'
-    const emailResult = await resend.emails.send({
-      from: 'AssetDrop <onboarding@resend.dev>',
-      to: clientEmail,
-      subject: `Asset Review Complete - ${project.name}`,
-      html: htmlContent,
-      text: textContent
-    })
+    // NOTE: Sender email must be verified in SendGrid
+    // ⚠️  IMPORTANT: You need to verify a sender email in SendGrid:
+    //   1. Go to https://app.sendgrid.com/settings/sender_auth/senders
+    //   2. Add and verify your email (e.g., hustlerashwin2400@gmail.com)
+    //   3. Set SENDGRID_FROM_EMAIL environment variable to that email
+    //   OR verify a domain for professional emails (noreply@yourdomain.com)
 
-    if (emailResult.error) {
-      console.error('❌ Resend API Error Details:')
-      console.error('   Full error object:', JSON.stringify(emailResult.error, null, 2))
-      console.error('   Error type:', typeof emailResult.error)
-      console.error('   Error name:', emailResult.error?.name)
-      console.error('   Error message:', emailResult.error?.message)
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL
+    const fromName = process.env.SENDGRID_FROM_NAME || 'AssetDrop'
+
+    try {
+      await sendgrid.send({
+        to: clientEmail,
+        from: {
+          email: fromEmail!,
+          name: fromName
+        },
+        subject: `Asset Review Complete - ${project.name}`,
+        html: htmlContent,
+        text: textContent
+      })
+
+      console.log('✅ Email sent successfully via SendGrid!')
+      console.log('📨 Sent to:', clientEmail)
+      console.log('📧 From:', `${fromName} <${fromEmail}>`)
+      console.log('📊 Summary: Approved:', approved.length, 'Rejected:', rejected.length)
+
+    } catch (error: any) {
+      console.error('❌ SendGrid API Error Details:')
+      console.error('   Full error object:', JSON.stringify(error, null, 2))
+      console.error('   Error type:', typeof error)
+      console.error('   Error code:', error.code)
+      console.error('   Error message:', error.message)
+      console.error('   Response body:', error.response?.body)
 
       // Provide specific error messages for common issues
-      let userMessage = 'Failed to send email via Resend'
-      const errorMsg = (emailResult.error?.message || '').toLowerCase()
+      let userMessage = 'Failed to send email via SendGrid'
+      const errorMsg = error.message || error.toString() || ''
+      const errorCode = error.code
 
-      // Check for specific Resend API errors
-      if (errorMsg.includes('verify a domain') || errorMsg.includes('testing emails')) {
-        userMessage = 'Domain verification required: Resend only allows sending to your registered email in testing mode. Please verify a domain at resend.com/domains to send to any email address.'
-        console.error('🚫 Resend Domain Restriction:')
-        console.error('   You can only send to your own email address until you verify a domain')
+      // Check for specific SendGrid API errors
+      if (errorMsg.toLowerCase().includes('not verified') || errorMsg.toLowerCase().includes('sender identity')) {
+        userMessage = 'Sender email not verified: You need to verify your sender email in SendGrid. Go to SendGrid Settings → Sender Authentication → Single Sender Verification and verify your email address.'
+        console.error('🚫 SendGrid Sender Verification Required:')
+        console.error('   Your sender email is not verified in SendGrid')
         console.error('📝 Steps to fix:')
-        console.error('   1. Go to https://resend.com/domains')
-        console.error('   2. Add and verify your domain')
-        console.error('   3. Update the "from" email in the code to use your domain')
-      } else if (errorMsg.includes('api') && (errorMsg.includes('key') || errorMsg.includes('token') || errorMsg.includes('auth'))) {
-        userMessage = 'Email service authentication failed. RESEND_API_KEY is missing or invalid.'
-        console.error('💡 Action required: Set a valid RESEND_API_KEY in Vercel environment variables')
-        console.error('🔗 Get your API key from: https://resend.com/api-keys')
-      } else if (errorMsg.includes('rate') && errorMsg.includes('limit')) {
+        console.error('   1. Go to https://app.sendgrid.com/settings/sender_auth/senders')
+        console.error('   2. Click "Create New Sender" or "Verify Single Sender"')
+        console.error('   3. Add your email (e.g., hustlerashwin2400@gmail.com)')
+        console.error('   4. Check your inbox and click verification link')
+        console.error('   5. Set SENDGRID_FROM_EMAIL=your@email.com in Vercel')
+      } else if (errorMsg.toLowerCase().includes('api') && (errorMsg.toLowerCase().includes('key') || errorMsg.toLowerCase().includes('unauthorized'))) {
+        userMessage = 'Email service authentication failed. SENDGRID_API_KEY is missing or invalid.'
+        console.error('💡 Action required: Set a valid SENDGRID_API_KEY in Vercel environment variables')
+        console.error('🔗 Get your API key from: https://app.sendgrid.com/settings/api_keys')
+      } else if (errorMsg.toLowerCase().includes('rate limit') || errorCode === 429) {
         userMessage = 'Email rate limit exceeded. Please try again in a few minutes.'
-      } else if (errorMsg.includes('recipient') || errorMsg.includes('to address')) {
-        userMessage = `Invalid recipient email address: ${clientEmail}`
-      } else if (errorMsg.includes('from address') || errorMsg.includes('sender')) {
-        userMessage = 'Invalid sender email. Using onboarding@resend.dev which should work in testing.'
+      } else if (errorMsg.toLowerCase().includes('invalid email') || errorMsg.toLowerCase().includes('malformed')) {
+        userMessage = `Invalid email address: ${clientEmail}`
       } else {
-        // For any other error, show the actual Resend error message
-        userMessage = `Resend API error: ${emailResult.error?.message || 'Unknown error'}`
+        // For any other error, show the actual SendGrid error message
+        userMessage = `SendGrid API error: ${errorMsg || 'Unknown error'}`
       }
 
       return NextResponse.json(
         {
           error: userMessage,
-          details: emailResult.error,
-          resendErrorMessage: emailResult.error?.message
+          details: error.response?.body || error,
+          sendgridErrorMessage: errorMsg
         },
         { status: 500 }
       )
     }
-
-    console.log('✅ Email sent successfully!')
-    console.log('📬 Email ID:', emailResult.data?.id)
-    console.log('📨 Sent to:', clientEmail)
-    console.log('📊 Summary: Approved:', approved.length, 'Rejected:', rejected.length)
 
     // Log activity
     await supabase.from('activity_log').insert({
@@ -200,13 +224,13 @@ export async function POST(request: NextRequest) {
         client_email: clientEmail,
         approved_count: approved.length,
         rejected_count: rejected.length,
-        email_id: emailResult.data?.id
+        service: 'sendgrid'
       }
     })
 
     return NextResponse.json({
       success: true,
-      emailId: emailResult.data?.id,
+      service: 'sendgrid',
       summary: {
         approved: approved.length,
         rejected: rejected.length
