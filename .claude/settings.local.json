@@ -14,7 +14,8 @@
       "Bash(node scripts/add-metadata-column.js:*)",
       "Bash(git add:*)",
       "Bash(if not exist \"lib\\email\" mkdir \"lib\\email\")",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(if exist \"vercel.json\" del \"vercel.json\")"
     ],
     "deny": [],
     "ask": []

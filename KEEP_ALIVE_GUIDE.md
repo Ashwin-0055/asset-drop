@@ -20,12 +20,12 @@ When your app is unused for weeks/months, free-tier services can pause or deacti
 
 ## ✅ The Solution: Automated Health Checks
 
-AssetDrop automatically keeps services active using **Vercel Cron Jobs** (100% free).
+AssetDrop automatically keeps services active using **cron-job.org** (100% free external service).
 
 ### How It Works
 
 ```
-Every 5 days → Vercel triggers /api/health-check → Pings services → All stay active
+Every 5 days → cron-job.org triggers /api/health-check → Pings services → All stay active
 ```
 
 **Services kept active:**
@@ -33,69 +33,90 @@ Every 5 days → Vercel triggers /api/health-check → Pings services → All st
 2. ✅ SendGrid - Test email sent once per month
 3. ✅ Google Drive - Guidance on OAuth publishing
 
-**Cost:** $0 (Vercel Cron Jobs are free on all plans)
+**Cost:** $0 (cron-job.org free plan allows unlimited cron jobs)
 
 ---
 
 ## 🛠️ Setup Instructions
 
-### 1. Add Cron Secret to Vercel (Recommended)
+### Step 1: Deploy Your Project
 
-This prevents unauthorized access to your health check endpoint.
-
-1. Go to your Vercel project dashboard
-2. Navigate to **Settings → Environment Variables**
-3. Add a new variable:
-   ```
-   Key: CRON_SECRET
-   Value: <generate a random string>
-   ```
-
-**Generate a secure secret:**
-```bash
-# On Mac/Linux
-openssl rand -base64 32
-
-# Or use any random string generator
-```
-
-4. Click **Save**
-5. Redeploy your project
-
-### 2. Deploy Your Project
-
-The cron job is configured in `vercel.json` and will activate automatically when you deploy:
+First, make sure your health check endpoint is deployed:
 
 ```bash
-git add .
-git commit -m "Add automated health checks"
 git push
 ```
 
-Vercel will detect `vercel.json` and set up the cron job automatically.
+Wait for Vercel to finish deploying. Your health check will be available at:
+```
+https://your-app.vercel.app/api/health-check
+```
 
-### 3. Verify Cron Job Setup
+### Step 2: Set Up Free Cron Service
 
-1. Go to your Vercel project dashboard
-2. Navigate to **Cron Jobs** tab (in the left sidebar)
-3. You should see:
-   ```
-   Path: /api/health-check
-   Schedule: 0 0 */5 * * (Every 5 days at midnight UTC)
-   Status: Active ✓
-   ```
+We'll use **cron-job.org** (100% free, unlimited jobs, no credit card required).
 
-### 4. Test Manually (Optional)
+**Why cron-job.org?**
+- ✅ Completely free forever
+- ✅ Unlimited cron jobs
+- ✅ Reliable (99.9% uptime)
+- ✅ No credit card required
+- ✅ Simple setup (2 minutes)
 
-You can test the health check manually:
+### Step 3: Create cron-job.org Account
 
+1. Go to **https://cron-job.org**
+2. Click **Sign up** (top right)
+3. Enter your email and create a password
+4. Verify your email (check inbox)
+5. Log in
+
+### Step 4: Create the Cron Job
+
+1. Click **"Cronjobs"** in the top menu
+2. Click **"Create cronjob"** button
+3. Fill in the form:
+
+**Settings:**
+```
+Title: AssetDrop Health Check
+URL: https://your-app.vercel.app/api/health-check
+Schedule: Every 5 days
+
+Enabled: ✓ (checked)
+Save responses: ✓ (optional, helps with debugging)
+```
+
+**Schedule Details:**
+- Click **"Every x days"**
+- Enter **5** days
+- Time: **00:00** (midnight)
+
+4. Click **"Create cronjob"**
+
+### Step 5: Test Immediately
+
+1. In the cronjob list, find your **"AssetDrop Health Check"**
+2. Click the **▶️ Play** button to run it immediately
+3. Wait 5-10 seconds
+4. Check the **"Last execution"** column:
+   - ✅ **Green checkmark** = Working!
+   - ❌ **Red X** = Something's wrong (check logs)
+
+### Step 6: Verify It Worked
+
+**Option A: Check cron-job.org logs**
+1. Click on your cronjob name
+2. Go to **"History"** tab
+3. You should see the response with status **200**
+
+**Option B: Check your email**
+- If it's been 30+ days since last test email, you'll receive a health check email from SendGrid
+- Check your verified SendGrid email inbox
+
+**Option C: Test manually**
 ```bash
-# Without auth (if CRON_SECRET not set)
 curl https://your-app.vercel.app/api/health-check
-
-# With auth (if CRON_SECRET is set)
-curl https://your-app.vercel.app/api/health-check \
-  -H "Authorization: Bearer your_cron_secret"
 ```
 
 **Expected response:**
@@ -122,6 +143,31 @@ curl https://your-app.vercel.app/api/health-check \
   "totalTime": 156
 }
 ```
+
+### Optional: Add CRON_SECRET (Extra Security)
+
+If you want to prevent unauthorized access:
+
+1. Generate a secret:
+   ```bash
+   openssl rand -base64 32
+   ```
+
+2. Add to Vercel environment variables:
+   - Go to Vercel dashboard → **Settings → Environment Variables**
+   - Add `CRON_SECRET` = `<your generated secret>`
+   - Redeploy
+
+3. Update cron-job.org:
+   - Edit your cronjob
+   - Click **"Request headers"**
+   - Add header:
+     ```
+     Authorization: Bearer <your generated secret>
+     ```
+   - Save
+
+**Note:** This is optional. The health check endpoint is safe to leave public.
 
 ---
 
@@ -198,12 +244,26 @@ To prevent Google Drive OAuth token expiry issues:
 
 ## 📊 Monitoring
 
-### Check Cron Job Logs
+### Check Cron Job Status
 
-1. Go to Vercel dashboard
-2. Navigate to **Deployments → [Your latest deployment] → Functions**
-3. Find `/api/health-check` in the list
-4. Click to view logs of recent executions
+1. Log in to **cron-job.org**
+2. Go to **"Cronjobs"** tab
+3. View your **"AssetDrop Health Check"** cronjob
+4. Check the status:
+   - ✅ **Green** = Last execution successful
+   - ❌ **Red** = Last execution failed
+   - **"Last execution"** column shows when it last ran
+   - **"Next execution"** shows when it runs next
+
+### View Execution History
+
+1. Click on your cronjob name in cron-job.org
+2. Go to **"History"** tab
+3. See all past executions with:
+   - Timestamp
+   - HTTP status code (200 = success)
+   - Response body (the health check JSON)
+   - Execution time
 
 ### Check Health Check Logs in Supabase
 
@@ -222,35 +282,42 @@ This helps track when test emails were sent.
 
 ### Cron job not running
 
-**Check 1: Is vercel.json committed?**
-```bash
-git log --all --full-history -- vercel.json
-```
+**Check 1: Is the cronjob enabled?**
+1. Log in to cron-job.org
+2. Check that your cronjob has ✓ **Enabled** checkbox checked
+3. If disabled, click **Edit** and enable it
 
-**Check 2: Did you deploy after adding vercel.json?**
-Cron jobs only activate after deployment.
+**Check 2: Check execution history**
+1. Click on your cronjob name
+2. Go to **"History"** tab
+3. If no executions show, try clicking **▶️ Play** to run manually
 
-**Check 3: Check Vercel dashboard**
-Go to **Cron Jobs** tab and verify status is "Active"
+**Check 3: Check cron-job.org account verification**
+Make sure you verified your email when signing up to cron-job.org
 
 ### Health check endpoint returns 401
 
-**Cause:** CRON_SECRET is set in Vercel, but the header isn't matching
+**Cause:** CRON_SECRET is set in Vercel, but cron-job.org isn't sending the header
 
-**Solution:** Vercel automatically adds the Authorization header. If testing manually:
-```bash
-curl https://your-app.vercel.app/api/health-check \
-  -H "Authorization: Bearer YOUR_ACTUAL_CRON_SECRET"
-```
+**Solution:** Add the Authorization header to cron-job.org:
+1. Edit your cronjob
+2. Scroll to **"Request headers"**
+3. Add header:
+   ```
+   Authorization: Bearer YOUR_ACTUAL_CRON_SECRET
+   ```
+4. Save
+
+Or disable CRON_SECRET if you don't need it (health check is safe to leave public)
 
 ### Supabase still paused
 
 **Possible causes:**
-1. Cron job isn't running (check logs)
-2. Supabase connection failed (check health check response)
+1. Cron job isn't running (check cron-job.org history)
+2. Supabase connection failed (check health check response in cron-job.org logs)
 3. Project was manually paused in Supabase dashboard
 
-**Solution:** Manually unpause in Supabase dashboard, then verify cron job is working.
+**Solution:** Manually unpause in Supabase dashboard, then verify cron job is working in cron-job.org.
 
 ### Not receiving monthly emails
 
@@ -264,19 +331,18 @@ curl https://your-app.vercel.app/api/health-check \
 
 ## 📅 Schedule Details
 
-The cron schedule `0 0 */5 * *` means:
-- **Minute:** 0 (at the start of the hour)
-- **Hour:** 0 (midnight)
-- **Day:** */5 (every 5 days)
-- **Month:** * (every month)
-- **Day of week:** * (any day)
-
-**In plain English:** Every 5 days at midnight UTC
+Your cron job is set to **"Every 5 days at midnight (00:00)"**
 
 **Why every 5 days?**
-- Supabase pauses after 7 days → 5 days provides 2-day buffer
-- Not too frequent (saves function invocations)
-- Frequent enough to keep everything active
+- Supabase pauses after 7 days of inactivity → 5 days provides 2-day safety buffer
+- Not too frequent (reduces unnecessary API calls)
+- Frequent enough to keep all services active
+- Emails sent only once per month (not every 5 days)
+
+**When does it run?**
+- First run: Immediately after you click ▶️ Play button
+- Subsequent runs: Every 5 days from the first run
+- Time: Midnight (00:00) in your timezone (set in cron-job.org account)
 
 ---
 
@@ -284,37 +350,57 @@ The cron schedule `0 0 */5 * *` means:
 
 | Service | Free Tier Limit | Our Usage | Cost |
 |---------|----------------|-----------|------|
-| **Vercel Cron Jobs** | Unlimited on Hobby plan | 1 job every 5 days (~6/month) | **$0** |
+| **cron-job.org** | Unlimited cron jobs | 1 job every 5 days (~6/month) | **$0** |
 | **Vercel Function Invocations** | 100,000/month | ~6/month | **$0** |
 | **SendGrid Emails** | 100/day free | 1/month | **$0** |
 | **Supabase Database** | 500 MB free | Tiny query every 5 days | **$0** |
 
 **Total monthly cost: $0**
 
+**Why this works:**
+- cron-job.org free plan = unlimited cron jobs forever
+- No credit card required
+- No upgrade pressure
+- Reliable service since 2007
+
 ---
 
 ## 🚀 Alternatives Considered
 
-### Why not paid plans?
-
 | Approach | Cost | Pros | Cons |
 |----------|------|------|------|
+| **Vercel Cron Jobs** | $0 (but limited) | Built into Vercel | Only 2 free cron jobs total |
 | **Supabase Pro** | $25/month | Never pauses, better performance | Expensive for small projects |
-| **UptimeRobot** | Free | External monitoring | Requires external service |
-| **GitHub Actions** | Free | Can run cron jobs | More complex setup |
-| **Our solution** | **$0/month** | ✅ Fully automated<br>✅ Zero maintenance<br>✅ Built-in | None! |
+| **UptimeRobot** | Free (50 monitors) | Reliable, popular | 5-minute minimum interval |
+| **GitHub Actions** | Free | Built into GitHub | More complex setup, rate limits |
+| **EasyCron** | Free (limited) | Simple interface | Only 1 job on free plan |
+| **cron-job.org** | **$0/month** | ✅ Unlimited jobs<br>✅ Reliable (99.9%)<br>✅ Simple setup<br>✅ No card needed | Requires separate account |
+
+**Winner:** cron-job.org for its unlimited free jobs and reliability.
 
 ---
 
 ## 📝 Summary
 
-✅ **Setup:** Add CRON_SECRET to Vercel, deploy
+✅ **Setup:** 2 minutes to create cron-job.org account and configure
 ✅ **Automation:** Runs every 5 days automatically
-✅ **Cost:** $0 (completely free)
+✅ **Cost:** $0 (completely free forever)
 ✅ **Maintenance:** Zero manual work required
-✅ **Reliability:** Prevents all service pauses
+✅ **Reliability:** 99.9% uptime, prevents all service pauses
 
 Your AssetDrop will stay active indefinitely, even during long periods of inactivity.
+
+---
+
+## 🎯 Quick Setup Checklist
+
+- [ ] Deploy AssetDrop to Vercel
+- [ ] Create account on cron-job.org
+- [ ] Create cronjob pointing to your /api/health-check endpoint
+- [ ] Set schedule to "Every 5 days"
+- [ ] Click ▶️ Play to test immediately
+- [ ] Verify green checkmark in execution history
+- [ ] Done! Services will stay active automatically
 
 ---
 
@@ -323,6 +409,7 @@ Your AssetDrop will stay active indefinitely, even during long periods of inacti
 **Contact:** hustlerashwin2400@gmail.com
 
 **Useful links:**
-- [Vercel Cron Jobs Docs](https://vercel.com/docs/cron-jobs)
+- [cron-job.org](https://cron-job.org) - Free cron service
+- [cron-job.org Documentation](https://console.cron-job.org/documentation)
 - [Supabase Pricing](https://supabase.com/pricing)
 - [SendGrid Account Health](https://docs.sendgrid.com/ui/account-and-settings/account)
